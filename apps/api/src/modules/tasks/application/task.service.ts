@@ -76,7 +76,7 @@ export class TaskService {
     });
 
     await db.update(tasks).set({ status: "running", updatedAt: now }).where(eq(tasks.id, task.id));
-    this.eventBus.publish("task.updated", { taskId: task.id, status: "running" });
+    this.eventBus.publish("task.updated", { taskId: task.id, divisionId: task.divisionId, title: task.title, status: "running" });
 
     runtime.onEvent(runId, async (event) => {
       this.eventBus.publish("run.event", { runId, event });
@@ -90,14 +90,14 @@ export class TaskService {
           updatedAt: endedAt
         }).where(eq(tasks.id, task.id));
 
-        this.eventBus.publish("task.updated", { taskId: task.id, status: "done" });
+        this.eventBus.publish("task.updated", { taskId: task.id, divisionId: task.divisionId, title: task.title, status: "done" });
         await this.auditService.record(task.divisionId, "task_done", "task", task.id, { summary: event.summary });
       } else if (event.type === "error") {
         const endedAt = new Date().toISOString();
         await db.update(runs).set({ status: "failed", endedAt, error: event.message }).where(eq(runs.id, runId));
         await db.update(tasks).set({ status: "failed", updatedAt: endedAt }).where(eq(tasks.id, task.id));
 
-        this.eventBus.publish("task.updated", { taskId: task.id, status: "failed" });
+        this.eventBus.publish("task.updated", { taskId: task.id, divisionId: task.divisionId, title: task.title, status: "failed" });
         await this.auditService.record(task.divisionId, "task_failed", "task", task.id, { error: event.message });
       }
     });

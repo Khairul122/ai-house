@@ -8,6 +8,8 @@ import { EventsController } from "./modules/events/http/events.controller.js";
 import { ProjectService } from "./modules/projects/application/project.service.js";
 import { ProjectsController } from "./modules/projects/http/projects.controller.js";
 import { TaskService } from "./modules/tasks/application/task.service.js";
+import { DemoController } from "./modules/office/demo.controller.js";
+import { OfficeController } from "./modules/office/office.controller.js";
 import { TelegramBotService } from "./modules/telegram/bot.service.js";
 
 @Module({
@@ -16,7 +18,9 @@ import { TelegramBotService } from "./modules/telegram/bot.service.js";
     DivisionsController,
     ProjectsController,
     ApprovalsController,
-    EventsController
+    EventsController,
+    OfficeController,
+    DemoController
   ],
   providers: [
     AuditService,

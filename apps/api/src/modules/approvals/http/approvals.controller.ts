@@ -4,6 +4,7 @@ import { db } from "../../../db/index.js";
 import { approvals } from "../../../db/schema/index.js";
 import { AuditService } from "../../audit/audit.service.js";
 import { EventBusService } from "../../events/event-bus.service.js";
+import { listPendingApprovals } from "../../office/office.controller.js";
 
 @Controller("api/approvals")
 export class ApprovalsController {
@@ -16,10 +17,7 @@ export class ApprovalsController {
 
   @Get()
   list() {
-    return db.query.approvals.findMany({
-      where: eq(approvals.status, "pending"),
-      orderBy: (a, { desc }) => [desc(a.expiresAt)]
-    });
+    return listPendingApprovals();
   }
 
   @Post(":id/decision")

@@ -6,9 +6,11 @@ import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { AppModule } from "./app.module.js";
 import { sqliteClient } from "./db/index.js";
-import "./db/migrate.js";
+import { migrateDb } from "./db/migrate.js";
 
 async function bootstrap() {
+  await migrateDb();
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({ logger: false })

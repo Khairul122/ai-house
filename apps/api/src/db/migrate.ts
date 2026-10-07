@@ -2,6 +2,8 @@ import { sqliteClient } from "./index.js";
 
 export async function migrateDb() {
   await sqliteClient.executeMultiple(`
+    PRAGMA busy_timeout = 5000;
+
     CREATE TABLE IF NOT EXISTS divisions (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,

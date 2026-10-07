@@ -37,7 +37,7 @@ export const ProjectsPage: React.FC = () => {
       setTitle("");
       setGoal("");
       loadProjects();
-    });
+    }).catch((err) => alert(`Gagal membuat proyek: ${err.message}`));
   };
 
   return (
