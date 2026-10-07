@@ -1,0 +1,16 @@
+{
+  "name": "ai-house",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel dev",
+    "build": "pnpm --filter @ai-house/shared build && pnpm --filter @ai-house/* build",
+    "test": "vitest run",
+    "lint": "biome check .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.3"
+  }
+}

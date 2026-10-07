@@ -1,0 +1,35 @@
+:root {
+  --bg: #F6F4EF;
+  --surface: #FFFFFF;
+  --ink: #1B1A17;
+  --ink-muted: #5E5A50;
+  --line: #DAD6CC;
+  --accent: #B4410F;
+  --ok: #2F7D4F;
+  --warn: #9A6B0F;
+  --danger: #B42318;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141310;
+    --surface: #1D1B17;
+    --ink: #ECE8DF;
+    --ink-muted: #A39E91;
+    --line: #35322B;
+    --accent: #E0773F;
+    --ok: #4DB37A;
+    --warn: #D9A441;
+    --danger: #F0766B;
+  }
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background-color: var(--bg);
+  color: var(--ink);
+}

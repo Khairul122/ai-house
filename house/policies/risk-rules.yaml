@@ -1,0 +1,40 @@
+risk_rules:
+  level_0:
+    description: "Read files, web fetch"
+    actions:
+      - read_file
+      - webfetch
+  level_1:
+    description: "Write files in workspace"
+    actions:
+      - write_file
+      - edit_file
+  level_2:
+    description: "Limited execute allowed commands"
+    bash_allow:
+      - "pnpm test*"
+      - "pnpm lint*"
+      - "pnpm build"
+      - "git status"
+      - "git diff*"
+      - "git add*"
+      - "git commit*"
+  level_3:
+    description: "Risky actions require human approval"
+    bash_ask:
+      - "git push*"
+      - "git merge*"
+      - "pnpm add*"
+      - "pnpm install*"
+      - "deploy*"
+      - "ssh*"
+  level_4:
+    description: "Forbidden actions always denied"
+    bash_deny:
+      - "rm -rf /"
+      - "rm -rf *"
+      - "git push --force*"
+      - "curl * | sh"
+      - "wget * | sh"
+      - "*~/.ssh*"
+      - "*../..*"

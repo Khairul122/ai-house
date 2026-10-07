@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=file:./data/house.db
+      - NINEROUTER_BASE_URL=http://router:20128/v1
+    volumes:
+      - ./data:/app/data
+      - ./workspaces:/app/workspaces
+    depends_on:
+      - router
+
+  router:
+    image: decolua/9router
+    ports:
+      - "20128:20128"
