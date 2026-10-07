@@ -1,4 +1,6 @@
 import { Module } from "@nestjs/common";
+import { runtimeProvider } from "./modules/agents/runtime.provider.js";
+import { ApprovalService } from "./modules/approvals/application/approval.service.js";
 import { ApprovalsController } from "./modules/approvals/http/approvals.controller.js";
 import { AuditService } from "./modules/audit/audit.service.js";
 import { DivisionsController } from "./modules/divisions/http/divisions.controller.js";
@@ -10,6 +12,7 @@ import { ProjectsController } from "./modules/projects/http/projects.controller.
 import { TaskService } from "./modules/tasks/application/task.service.js";
 import { DemoController } from "./modules/office/demo.controller.js";
 import { OfficeController } from "./modules/office/office.controller.js";
+import { OrchestratorService } from "./modules/orchestrator/orchestrator.service.js";
 import { TelegramBotService } from "./modules/telegram/bot.service.js";
 
 @Module({
@@ -28,7 +31,10 @@ import { TelegramBotService } from "./modules/telegram/bot.service.js";
     ProjectService,
     TaskService,
     TelegramBotService,
-    FileDivisionRepository
+    FileDivisionRepository,
+    ApprovalService,
+    OrchestratorService,
+    runtimeProvider
   ]
 })
 export class AppModule {}

@@ -2,24 +2,24 @@ import fs from "node:fs";
 import path from "node:path";
 import type { AgentRuntime, RunEvent, StartRunInput } from "../domain/agent-runtime.port.js";
 
+// Runtime tiruan untuk tes dan pengembangan tanpa model. Divisi di `askFor` meminta izin
+// menjalankan perintah bash dan baru selesai setelah izin dijawab.
 export class FakeAgentRuntime implements AgentRuntime {
   private callbacks = new Map<string, (event: RunEvent) => Promise<void> | void>();
+  private pending = new Map<string, () => Promise<void>>();
+
+  constructor(private readonly options: { askFor?: Record<string, string> } = {}) {}
 
   async startRun(input: StartRunInput): Promise<void> {
-    const cb = this.callbacks.get(input.runId);
+    const emit = async (e: RunEvent) => {
+      await this.callbacks.get(input.runId)?.(e);
+    };
 
-    if (cb) {
-      await cb({ type: "text", content: `Memulai tugas ${input.taskTitle}...` });
-    }
+    await emit({ type: "text", content: `Memulai tugas ${input.taskTitle}...` });
+    fs.mkdirSync(input.workspacePath, { recursive: true });
 
-    // Ensure workspace path exists
-    if (!fs.existsSync(input.workspacePath)) {
-      fs.mkdirSync(input.workspacePath, { recursive: true });
-    }
-
-    // Produce mock outputs based on division
     if (input.divisionId === "pm") {
-      const mockPlan = {
+      const plan = {
         title: input.taskTitle,
         goal: input.taskDescription,
         tasks: [
@@ -39,34 +39,44 @@ export class FakeAgentRuntime implements AgentRuntime {
           }
         ]
       };
-      fs.writeFileSync(path.join(input.workspacePath, "plan.json"), JSON.stringify(mockPlan, null, 2));
+      fs.writeFileSync(path.join(input.workspacePath, "plan.json"), JSON.stringify(plan, null, 2));
     } else {
       const reportsDir = path.join(input.workspacePath, "reports");
-      if (!fs.existsSync(reportsDir)) {
-        fs.mkdirSync(reportsDir, { recursive: true });
-      }
+      fs.mkdirSync(reportsDir, { recursive: true });
       fs.writeFileSync(
         path.join(reportsDir, `${input.taskId}.md`),
-        `# Laporan Tugas: ${input.taskTitle}\n\nTugas berhasil dijalankan oleh divisi ${input.divisionId}.`
+        `# Laporan Tugas: ${input.taskTitle}\n\nTugas dijalankan oleh divisi ${input.divisionId}.`
       );
     }
 
-    if (cb) {
-      await cb({ type: "usage", tokensIn: 150, tokensOut: 300 });
-      await cb({ type: "done", summary: `Tugas ${input.taskTitle} berhasil diselesaikan.` });
+    const finish = async () => {
+      await emit({ type: "usage", tokensIn: 150, tokensOut: 300 });
+      await emit({ type: "done", summary: `Tugas ${input.taskTitle} berhasil diselesaikan.` });
+    };
+
+    const command = this.options.askFor?.[input.divisionId];
+    if (command) {
+      const permissionId = `per_${input.runId}`;
+      this.pending.set(permissionId, finish);
+      await emit({ type: "permission", permissionId, permission: "bash", patterns: [command] });
+      return;
     }
+    await finish();
   }
 
   async cancelRun(runId: string): Promise<void> {
-    const cb = this.callbacks.get(runId);
-    if (cb) {
-      cb({ type: "error", message: "Run dibatalkan pengguna." });
-    }
+    await this.callbacks.get(runId)?.({ type: "error", message: "Run dibatalkan." });
   }
 
-  async respondPermission(_runId: string, _permissionId: string, _decision: "allow" | "deny"): Promise<void> {}
+  async respondPermission(runId: string, permissionId: string, decision: "allow" | "deny"): Promise<void> {
+    const finish = this.pending.get(permissionId);
+    this.pending.delete(permissionId);
+    if (!finish) return;
+    if (decision === "allow") await finish();
+    else await this.callbacks.get(runId)?.({ type: "error", message: "Izin ditolak, tugas dihentikan." });
+  }
 
-  onEvent(runId: string, callback: (event: RunEvent) => void): void {
+  onEvent(runId: string, callback: (event: RunEvent) => Promise<void> | void): void {
     this.callbacks.set(runId, callback);
   }
 }

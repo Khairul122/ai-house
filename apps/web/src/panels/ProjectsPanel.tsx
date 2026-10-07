@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { ErrorNote, PanelShell } from "../components/PanelShell.tsx";
 import { postJson, timeAgo, useFetch } from "../lib/hooks.ts";
 import { useOffice } from "../state/store.ts";
@@ -11,9 +12,10 @@ interface Project {
   createdAt: string;
 }
 
-const STATUS: Record<string, string> = {
+export const PROJECT_STATUS: Record<string, string> = {
   draft: "Draf",
-  planning: "Direncanakan PM",
+  planning: "PM menyusun rencana",
+  plan_review: "Menunggu persetujuan rencana",
   in_progress: "Berjalan",
   completed: "Selesai",
   failed: "Gagal",
@@ -22,7 +24,8 @@ const STATUS: Record<string, string> = {
 
 export function ProjectsPanel() {
   const version = useOffice((s) => s.version);
-  const { data, error, reload } = useFetch<Project[]>("/api/projects", version);
+  const { data, error } = useFetch<Project[]>("/api/projects", version);
+  const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [goal, setGoal] = useState("");
   const [busy, setBusy] = useState(false);
@@ -36,12 +39,8 @@ export function ProjectsPanel() {
     }
     setBusy(true);
     setFormError(null);
-    postJson("/api/projects", { title: title.trim(), goal: goal.trim() })
-      .then(() => {
-        setTitle("");
-        setGoal("");
-        reload();
-      })
+    postJson<Project>("/api/projects", { title: title.trim(), goal: goal.trim() })
+      .then((p) => navigate(`/projects/${p.id}`))
       .catch((err: Error) => setFormError(`Proyek gagal dibuat. ${err.message}`))
       .finally(() => setBusy(false));
   };
@@ -67,15 +66,17 @@ export function ProjectsPanel() {
       {data?.length === 0 && <p className="text-sm text-ink-muted">Belum ada proyek. Isi judul dan tujuan di atas untuk membuat yang pertama.</p>}
       <ul className="divide-y divide-line border-y border-line">
         {data?.map((p) => (
-          <li key={p.id} className="py-3 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-ink">{p.title}</p>
-              <p className="text-sm text-ink-muted">{p.goal}</p>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="text-xs font-semibold text-ink">{STATUS[p.status] ?? p.status}</p>
-              <p className="text-xs text-ink-muted">{timeAgo(p.createdAt)}</p>
-            </div>
+          <li key={p.id}>
+            <Link to={`/projects/${p.id}`} className="py-3 px-1 flex items-start justify-between gap-3 hover:bg-line/20">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink">{p.title}</p>
+                <p className="text-sm text-ink-muted line-clamp-2">{p.goal}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-xs font-semibold text-ink">{PROJECT_STATUS[p.status] ?? p.status}</p>
+                <p className="text-xs text-ink-muted">{timeAgo(p.createdAt)}</p>
+              </div>
+            </Link>
           </li>
         ))}
       </ul>

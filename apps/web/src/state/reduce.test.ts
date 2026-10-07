@@ -35,6 +35,8 @@ describe("reduce", () => {
     expect(s.agents.qa.status).toBe("idle");
     s = reduce(s, { type: "task.updated", payload: { taskId: "t2", divisionId: "qa", title: "Uji", status: "failed" } });
     expect(visibleStatus(s.agents.qa, 999999)).toBe("failed");
+    s = reduce(s, { type: "task.updated", payload: { taskId: "t3", divisionId: "qa", title: "Uji", status: "cancelled" } });
+    expect(s.agents.qa.status).toBe("idle");
   });
 
   it("antrean map tugas PM", () => {

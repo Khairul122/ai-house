@@ -21,6 +21,7 @@ export const TaskStatusSchema = z.enum([
 export const ProjectStatusSchema = z.enum([
   "draft",
   "planning",
+  "plan_review",
   "in_progress",
   "completed",
   "failed",

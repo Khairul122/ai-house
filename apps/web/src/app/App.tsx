@@ -7,6 +7,7 @@ import { useReducedMotion } from "../lib/hooks.ts";
 import { ActivityPanel } from "../panels/ActivityPanel.tsx";
 import { ApprovalsPanel } from "../panels/ApprovalsPanel.tsx";
 import { DivisionPanel, DivisionsPanel } from "../panels/DivisionsPanel.tsx";
+import { ProjectPanel } from "../panels/ProjectPanel.tsx";
 import { ProjectsPanel } from "../panels/ProjectsPanel.tsx";
 import { useLiveOffice } from "../state/store.ts";
 
@@ -53,6 +54,7 @@ function Shell() {
       <Routes>
         <Route path="/" element={null} />
         <Route path="/projects" element={<ProjectsPanel />} />
+        <Route path="/projects/:id" element={<ProjectPanel />} />
         <Route path="/approvals" element={<ApprovalsPanel />} />
         <Route path="/activity" element={<ActivityPanel />} />
         <Route path="/divisions" element={<DivisionsPanel />} />

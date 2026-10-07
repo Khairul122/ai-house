@@ -1,6 +1,5 @@
+import "./env.js";
 import "reflect-metadata";
-import dotenv from "dotenv";
-dotenv.config();
 
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";

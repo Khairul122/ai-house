@@ -15,7 +15,13 @@ const VERB: Record<string, string> = {
   project_planned: "selesai merencanakan proyek",
   task_done: "menyelesaikan",
   task_failed: "gagal mengerjakan",
-  approval_requested: "meminta izin"
+  approval_requested: "meminta izin",
+  plan_approved: "menyetujui rencana proyek",
+  plan_rejected: "menolak rencana proyek",
+  project_completed: "menyelesaikan proyek",
+  project_stopped: "menghentikan proyek",
+  permission_denied: "ditolak otomatis saat mencoba",
+  emergency_stop: "menghentikan semua run"
 };
 
 const DECISION: Record<string, string> = { approved: "menyetujui permintaan izin", rejected: "menolak permintaan izin" };

@@ -179,3 +179,5 @@ a:focus-visible, button:focus-visible, .panel:focus-visible { outline: 2px solid
   background: var(--surface); border: 1px solid var(--line); border-top-width: 4px; border-radius: 6px; padding: 10px 12px;
 }
 .hud > .hud-card:first-child { flex-shrink: 0; white-space: nowrap; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { filter: brightness(1.08); }

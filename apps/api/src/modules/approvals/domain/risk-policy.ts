@@ -26,12 +26,18 @@ export class RiskPolicy {
     /ssh\s+/i
   ];
 
-  assessBashCommand(command: string, customAllow: string[] = [], customAsk: string[] = []): ActionAssessment {
+  assessBashCommand(
+    command: string,
+    customAllow: string[] = [],
+    customAsk: string[] = [],
+    customDeny: string[] = []
+  ): ActionAssessment {
     const trimmed = command.trim();
 
     // Check Level 4 (Forbidden)
+    const isCustomDeny = customDeny.some((pattern) => this.matchWildcard(trimmed, pattern));
     for (const pattern of this.forbiddenPatterns) {
-      if (pattern.test(trimmed)) {
+      if (isCustomDeny || pattern.test(trimmed)) {
         return {
           riskLevel: 4,
           allowed: false,

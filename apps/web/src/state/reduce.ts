@@ -81,6 +81,7 @@ export function reduce(state: OfficeState, event: OfficeEvent, now = Date.now())
       if (p.status === "running") return patch(p.divisionId, { status: "working", task });
       if (p.status === "done") return patch(p.divisionId, { status: "done", task, approval: null });
       if (p.status === "failed") return patch(p.divisionId, { status: "failed", task, approval: null });
+      if (p.status === "cancelled") return patch(p.divisionId, { status: "idle", task: null, approval: null });
       return { ...state, version: state.version + 1 };
     }
     case "approval.created": {
