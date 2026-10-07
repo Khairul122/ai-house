@@ -2,7 +2,7 @@
 id: devops
 name: DevOps
 description: CI/CD, kontainer, proses rilis.
-model: 9router/default-model
+model: 9router/ComboOpenCode
 permission:
   read: allow
   edit: workspace

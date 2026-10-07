@@ -2,7 +2,7 @@
 id: data-analyst
 name: Data Analyst/Scientist
 description: Membersihkan data, analisis, visualisasi, model sederhana.
-model: 9router/default-model
+model: 9router/ComboOpenCode
 permission:
   read: allow
   edit: workspace

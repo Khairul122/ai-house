@@ -57,4 +57,12 @@ describe("assessPermission", () => {
     expect(assessPermission(rules, ws, "webfetch", ["https://contoh.id"]).riskLevel).toBe(4);
     expect(assessPermission(rules, ws, "external_directory", ["C:/"]).requiresApproval).toBe(true);
   });
+
+  it("aksi shell v2 dinilai seperti bash, konfigurasi izin dilindungi", () => {
+    expect(assessPermission(rules, ws, "shell", ["docker run nginx"]).requiresApproval).toBe(true);
+    expect(assessPermission(rules, ws, "edit", ["opencode.json"]).riskLevel).toBe(4);
+    expect(assessPermission(rules, ws, "edit", [".opencode/agent.md"]).riskLevel).toBe(4);
+    expect(assessPermission(rules, ws, "edit", ["D:\\house\\workspaces\\p1\\.opencode\\agent.md"]).riskLevel).toBe(4);
+    expect(assessPermission(rules, ws, "edit", ["src/opencode-notes.md"]).allowed).toBe(true);
+  });
 });

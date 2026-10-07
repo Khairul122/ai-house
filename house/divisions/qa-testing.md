@@ -2,7 +2,7 @@
 id: qa-testing
 name: QA & Testing
 description: Menulis dan menjalankan tes, melaporkan bug.
-model: 9router/default-model
+model: 9router/ComboOpenCode
 permission:
   read: allow
   edit: workspace

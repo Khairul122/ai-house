@@ -1,4 +1,7 @@
+import fs from "node:fs";
 import http from "node:http";
+import os from "node:os";
+import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { RunEvent } from "../src/modules/agents/domain/agent-runtime.port.js";
@@ -56,6 +59,7 @@ describe("OpenCodeSdkRuntime", () => {
 
   it("membuat session, meneruskan izin, lalu melapor selesai dengan ringkasan", async () => {
     process.env.OPENCODE_SERVER_PASSWORD = "rahasia";
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), "house-ws-"));
     const runtime = new OpenCodeSdkRuntime(base);
     const events: RunEvent[] = [];
     const done = new Promise<void>((resolve) => {
@@ -74,7 +78,7 @@ describe("OpenCodeSdkRuntime", () => {
       prompt: "Kamu divisi Dev.",
       taskTitle: "Buat halaman",
       taskDescription: "index.html",
-      workspacePath: "D:/ws/p1"
+      workspacePath: ws
     });
     await done;
 
@@ -84,7 +88,14 @@ describe("OpenCodeSdkRuntime", () => {
       { type: "done", summary: "Halaman selesai dibuat." }
     ]);
     const create = JSON.parse(seen.find((s) => s.url === "/api/session" && s.method === "POST")!.body);
-    expect(create).toEqual({ location: { directory: "D:/ws/p1" }, agent: "build", model: { providerID: "9router", id: "default-model" } });
+    expect(create).toEqual({ location: { directory: ws }, agent: "build", model: { providerID: "9router", id: "default-model" } });
+
+    // workspace mendapat konfigurasi: model terdaftar, semua aksi "ask"
+    const cfg = JSON.parse(fs.readFileSync(path.join(ws, "opencode.json"), "utf-8"));
+    expect(cfg.providers["9router"].models).toEqual({ "default-model": { modelID: "default-model" } });
+    expect(cfg.permissions.every((r: { effect: string }) => r.effect === "ask")).toBe(true);
+    expect(cfg.permissions.map((r: { action: string }) => r.action)).toContain("shell");
+    fs.rmSync(ws, { recursive: true, force: true });
     expect(JSON.parse(seen.find((s) => s.url.endsWith("/reply"))!.body)).toEqual({ reply: "once" });
     expect(seen[0].auth).toBe(`Basic ${Buffer.from("opencode:rahasia").toString("base64")}`);
   });

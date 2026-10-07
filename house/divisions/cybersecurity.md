@@ -2,7 +2,7 @@
 id: cybersecurity
 name: Cybersecurity
 description: Audit kode, pemeriksaan dependensi, tinjauan konfigurasi.
-model: 9router/default-model
+model: 9router/ComboOpenCode
 permission:
   read: allow
   edit: workspace

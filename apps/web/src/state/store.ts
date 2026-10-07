@@ -44,6 +44,14 @@ export function useDivisions(): Division[] {
   );
 }
 
+export const reloadDivisions = () =>
+  fetchJson<Division[]>("/api/divisions")
+    .then((d) => {
+      divisions = d;
+      for (const l of divisionListeners) l();
+    })
+    .catch(() => {});
+
 const loadSnapshot = () =>
   fetchJson<SnapshotItem[]>("/api/office")
     .then((payload) => office.send({ type: "snapshot", payload }))
@@ -53,12 +61,7 @@ const loadSnapshot = () =>
 // setiap tersambung kembali, snapshot dimuat ulang agar event yang terlewat tidak hilang.
 export function useLiveOffice() {
   useEffect(() => {
-    fetchJson<Division[]>("/api/divisions")
-      .then((d) => {
-        divisions = d;
-        for (const l of divisionListeners) l();
-      })
-      .catch(() => {});
+    reloadDivisions();
 
     const es = new EventSource("/api/events");
     es.onopen = () => {

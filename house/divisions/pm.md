@@ -2,7 +2,7 @@
 id: pm
 name: Product & Project Management
 description: Menerima perintah, menyusun rencana, membagi tugas, memantau, melapor.
-model: 9router/default-model
+model: 9router/ComboOpenCode
 permission:
   read: allow
   edit: workspace

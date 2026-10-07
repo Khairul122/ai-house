@@ -2,7 +2,7 @@
 id: infrastructure-network
 name: Infrastructure & Network
 description: Konfigurasi server, jaringan, dan IaC.
-model: 9router/default-model
+model: 9router/ComboOpenCode
 permission:
   read: allow
   edit: workspace

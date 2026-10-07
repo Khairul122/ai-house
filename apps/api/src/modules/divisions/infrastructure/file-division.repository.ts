@@ -44,6 +44,19 @@ export class FileDivisionRepository {
     return this.loadFile(filePath);
   }
 
+  // Mengganti baris `model:` di frontmatter tanpa menyentuh isi lain berkas.
+  setModel(id: string, model: string): DivisionEntity | null {
+    const filePath = path.join(this.divisionsDir, `${id}.md`);
+    if (!fs.existsSync(filePath)) return null;
+    const raw = fs.readFileSync(filePath, "utf-8");
+    const end = raw.indexOf("\n---", 3);
+    if (!raw.startsWith("---") || end < 0) throw new Error(`Frontmatter ${id}.md tidak valid.`);
+    const head = raw.slice(0, end);
+    const nextHead = /^model:.*$/m.test(head) ? head.replace(/^model:.*$/m, `model: ${model}`) : `${head}\nmodel: ${model}`;
+    fs.writeFileSync(filePath, nextHead + raw.slice(end));
+    return this.loadFile(filePath);
+  }
+
   private loadFile(filePath: string): DivisionEntity {
     const raw = fs.readFileSync(filePath, "utf-8");
     const { frontmatter, body } = this.parseFrontmatter(raw);

@@ -2,7 +2,7 @@
 id: research-content
 name: Riset & Konten
 description: Riset pasar atau teknis, dokumentasi, penulisan teks produk.
-model: 9router/default-model
+model: 9router/ComboOpenCode
 permission:
   read: allow
   edit: workspace

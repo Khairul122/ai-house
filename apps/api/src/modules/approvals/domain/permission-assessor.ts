@@ -8,6 +8,9 @@ const allow = (riskLevel: 0 | 1 | 2, reason: string): ActionAssessment => ({ ris
 const deny = (reason: string): ActionAssessment => ({ riskLevel: 4, allowed: false, requiresApproval: false, reason });
 const ask = (reason: string): ActionAssessment => ({ riskLevel: 3, allowed: false, requiresApproval: true, reason });
 
+// Berkas konfigurasi OpenCode di workspace mengatur izin agen; agen tidak boleh mengubahnya sendiri.
+const PROTECTED = /(^|[\\/])(opencode\.jsonc?|\.opencode)([\\/]|$)/i;
+
 // Pilih penilaian paling berisiko: tolak > tanya > izinkan.
 function worst(list: ActionAssessment[]): ActionAssessment {
   return list.reduce((a, b) => (b.riskLevel > a.riskLevel ? b : a));
@@ -23,10 +26,12 @@ export function assessPermission(
   const targets = patterns.length ? patterns : ["*"];
   switch (permission) {
     case "bash":
+    case "shell": // nama aksi di OpenCode v2
       return worst(targets.map((cmd) => policy.assessBashCommand(cmd, rules.bash.allow, rules.bash.ask, rules.bash.deny)));
     case "edit":
     case "write":
       if (rules.edit === "deny") return deny("Divisi ini tidak boleh mengubah berkas.");
+      if (targets.some((p) => PROTECTED.test(p))) return deny("Konfigurasi izin OpenCode tidak boleh diubah agen.");
       return worst(targets.map((p) => policy.assessWorkspacePath(path.resolve(workspace, p), workspace)));
     case "webfetch":
       return rules.webfetch === "allow" ? allow(1, "Akses web diizinkan untuk divisi ini.") : deny("Divisi ini tidak boleh mengakses web.");

@@ -2,7 +2,7 @@
 id: software-development
 name: Software/App Development
 description: Menulis, mengubah, dan memperbaiki kode.
-model: 9router/default-model
+model: 9router/ComboOpenCode
 permission:
   read: allow
   edit: workspace

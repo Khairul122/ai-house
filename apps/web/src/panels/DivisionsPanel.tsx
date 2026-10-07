@@ -5,6 +5,7 @@ import type { AgentState, AgentStatus } from "../state/reduce.ts";
 import { useDivisions } from "../state/store.ts";
 import { useAgentStatus } from "../state/useAgentStatus.ts";
 import { ApprovalCard } from "./ApprovalCard.tsx";
+import { ModelPicker } from "./ModelPicker.tsx";
 
 export const STATUS_LABEL: Record<AgentStatus, string> = {
   idle: "Santai",
@@ -88,10 +89,7 @@ export function DivisionPanel() {
         <>
           <p className="text-sm text-ink-muted mb-4">{division.description}</p>
           <dl className="space-y-3 border-t border-line pt-4">
-            <div>
-              <dt className="text-xs font-semibold text-ink-muted">Model</dt>
-              <dd className="font-mono text-xs text-ink mt-0.5">{division.model}</dd>
-            </div>
+            <ModelPicker key={division.id} divisionId={division.id} current={division.model} />
             <Rules label="Boleh tanpa izin" items={division.permission.bash.allow} tone="text-ok" />
             <Rules label="Harus minta izin" items={division.permission.bash.ask} tone="text-warn" />
             <Rules label="Selalu ditolak" items={division.permission.bash.deny} tone="text-danger" />

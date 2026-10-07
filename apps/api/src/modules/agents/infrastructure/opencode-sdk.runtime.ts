@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { AgentRuntime, RunEvent, StartRunInput } from "../domain/agent-runtime.port.js";
 
 type Callback = (event: RunEvent) => Promise<void> | void;
@@ -22,6 +24,7 @@ export class OpenCodeSdkRuntime implements AgentRuntime {
 
   async startRun(input: StartRunInput): Promise<void> {
     await this.connect();
+    writeWorkspaceConfig(input.workspacePath, input.model);
     const [providerID, ...rest] = input.model.split("/");
     const session = await this.api<{ id: string }>("POST", "/api/session", {
       location: { directory: input.workspacePath },
@@ -177,6 +180,34 @@ export class OpenCodeSdkRuntime implements AgentRuntime {
       this.forget(runId);
     }
   }
+}
+
+// Konfigurasi OpenCode per workspace:
+// - mendaftarkan model 9router pilihan divisi (kunci API dibaca OpenCode dari env NINEROUTER_API_KEY),
+// - semua aksi "ask", supaya setiap izin lewat penilaian risiko House dan tidak diloloskan
+//   oleh aturan "allow" di konfigurasi global OpenCode milik pengguna.
+export function writeWorkspaceConfig(workspace: string, model: string) {
+  const [providerID, ...rest] = model.split("/");
+  const id = rest.join("/");
+  const actions = ["*", "shell", "edit", "read", "glob", "grep", "list", "webfetch", "websearch", "external_directory", "skill", "task"];
+  const config = {
+    $schema: "https://opencode.ai/config.json",
+    ...(providerID === "9router" && id
+      ? {
+          providers: {
+            "9router": {
+              package: "@opencode/ai/providers/openai-compatible",
+              env: ["NINEROUTER_API_KEY"],
+              settings: { baseURL: process.env.NINEROUTER_BASE_URL || "http://127.0.0.1:20128/v1" },
+              models: { [id]: { modelID: id } }
+            }
+          }
+        }
+      : {}),
+    permissions: actions.map((action) => ({ action, resource: "*", effect: "ask" }))
+  };
+  fs.mkdirSync(workspace, { recursive: true });
+  fs.writeFileSync(path.join(workspace, "opencode.json"), JSON.stringify(config, null, 2));
 }
 
 // Ambil teks balasan asisten terakhir dari daftar pesan, apa pun bentuk persisnya.

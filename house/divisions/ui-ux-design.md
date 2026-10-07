@@ -2,7 +2,7 @@
 id: ui-ux-design
 name: UI/UX Design
 description: Wireframe, design system, tinjauan tampilan.
-model: 9router/default-model
+model: 9router/ComboOpenCode
 permission:
   read: allow
   edit: workspace
