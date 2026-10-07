@@ -33,3 +33,149 @@ body {
   background-color: var(--bg);
   color: var(--ink);
 }
+
+/* Bricolage Grotesque: sedikit tidak rata, seperti papan nama yang dicat tangan di kantor kecil. Hanya untuk judul. */
+.font-display {
+  font-family: "Bricolage Grotesque", system-ui, sans-serif;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+html, body, #root { height: 100%; }
+body { overflow: hidden; }
+
+.app { position: fixed; inset: 0; }
+.stage { position: absolute; inset: 0; }
+.stage-note { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-muted); font-size: 0.875rem; }
+
+/* Papan nama ruangan dan gelembung tugas (HTML di dalam kanvas 3D) */
+.room-sign {
+  font-family: "Bricolage Grotesque", system-ui, sans-serif;
+  font-weight: 650;
+  font-size: 12px;
+  white-space: nowrap;
+  color: #1B1A17;
+  background: #F6F1E6;
+  border: 1.5px solid #8A6442;
+  border-radius: 3px;
+  padding: 1px 7px;
+  user-select: none;
+}
+.room-sign.is-selected { background: #1B1A17; color: #F6F1E6; }
+.speech {
+  max-width: 150px;
+  font-size: 11px;
+  line-height: 1.25;
+  color: #1B1A17;
+  background: #FFFFFF;
+  border: 1px solid #DAD6CC;
+  border-radius: 6px;
+  padding: 3px 7px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+/* HUD atas */
+.hud {
+  position: absolute; top: 12px; left: 12px; right: 12px; z-index: 20;
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+  pointer-events: none;
+}
+.hud > * { pointer-events: auto; }
+.hud-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px 12px; color: var(--ink);
+}
+.hud-btn {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 12px; font-size: 0.8125rem; font-weight: 600; color: var(--ink);
+  min-height: 36px;
+}
+.hud-btn:hover:not(:disabled) { border-color: var(--ink-muted); }
+.hud-btn:disabled { color: var(--ink-muted); }
+.conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-muted); }
+.conn-live { background: var(--ok); }
+.conn-offline { background: var(--warn); }
+
+/* Dok navigasi bawah */
+.dock {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 30;
+  display: flex; gap: 2px; padding: 4px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  max-width: calc(100vw - 24px);
+}
+.dock-item {
+  position: relative; display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; min-height: 40px; border-radius: 5px;
+  font-size: 0.8125rem; font-weight: 600; color: var(--ink-muted);
+}
+.dock-item:hover { color: var(--ink); background: color-mix(in srgb, var(--line) 35%, transparent); }
+.dock-item.is-active { color: var(--surface); background: var(--ink); }
+.dock-badge {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--warn); color: #fff; font-size: 11px; line-height: 18px; text-align: center;
+}
+@media (max-width: 480px) {
+  .dock { left: 8px; right: 8px; transform: none; justify-content: space-around; }
+  .dock-item { flex-direction: column; gap: 2px; padding: 6px 4px; font-size: 0.6875rem; flex: 1; }
+  .dock-badge { position: absolute; top: 2px; right: 8px; }
+}
+
+/* Panel: samping di laptop, lembar bawah di ponsel. Bayangan dipakai karena panel melayang di atas kanvas. */
+.panel {
+  position: absolute; z-index: 30; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.12);
+  outline: none;
+  left: 0; right: 0; bottom: 0; max-height: 56vh; border-radius: 10px 10px 0 0;
+  padding-bottom: 72px;
+}
+@media (min-width: 768px) {
+  .panel { left: auto; right: 12px; top: 64px; bottom: 76px; width: 420px; max-height: none; border-radius: 8px; padding-bottom: 0; }
+}
+.panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 16px 18px 12px; border-bottom: 1px solid var(--line); }
+.panel-body { padding: 16px 18px 20px; overflow-y: auto; flex: 1; }
+.icon-btn { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 6px; color: var(--ink-muted); flex-shrink: 0; }
+.icon-btn:hover { color: var(--ink); background: color-mix(in srgb, var(--line) 40%, transparent); }
+
+.field { display: block; }
+.field > span { display: block; font-size: 0.75rem; font-weight: 600; color: var(--ink-muted); margin-bottom: 3px; }
+.field input, .field textarea {
+  width: 100%; font-size: 0.875rem; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 5px; padding: 7px 10px; resize: vertical;
+}
+.field input:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+
+.btn { font-size: 0.875rem; font-weight: 600; padding: 7px 14px; border-radius: 5px; min-height: 36px; border: 1px solid transparent; }
+.btn:disabled { opacity: 0.55; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-ok { background: var(--ok); color: #fff; }
+.btn-ok:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn-ghost:hover:not(:disabled) { border-color: var(--ink-muted); }
+
+.approval { border: 1px solid var(--warn); border-radius: 6px; padding: 12px; background: color-mix(in srgb, var(--warn) 6%, var(--surface)); }
+
+.tag { display: inline-block; font-size: 0.6875rem; font-weight: 700; padding: 1px 7px; border-radius: 3px; background: color-mix(in srgb, var(--line) 50%, transparent); color: var(--ink-muted); }
+.tag-working { color: var(--ink); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.tag-waiting { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.tag-failed { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.tag-done { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+
+.row-link { display: flex; align-items: center; gap: 10px; padding: 10px 4px; min-height: 44px; }
+.row-link:hover { background: color-mix(in srgb, var(--line) 25%, transparent); }
+.swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+a:focus-visible, button:focus-visible, .panel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Denah 2D cadangan */
+.fallback { position: absolute; inset: 0; overflow-y: auto; padding: 84px 16px 96px; }
+.fallback-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.fallback-tile {
+  display: flex; flex-direction: column; gap: 6px; text-align: left;
+  background: var(--surface); border: 1px solid var(--line); border-top-width: 4px; border-radius: 6px; padding: 10px 12px;
+}
+.hud > .hud-card:first-child { flex-shrink: 0; white-space: nowrap; }

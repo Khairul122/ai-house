@@ -1,6 +1,6 @@
 import { Html } from "@react-three/drei";
 import { type ThreeEvent, useFrame } from "@react-three/fiber";
-import React, { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { type Mesh, Vector3 } from "three";
 import type { AgentStatus } from "../../state/reduce.ts";
 import { useAgentStatus } from "../../state/useAgentStatus.ts";

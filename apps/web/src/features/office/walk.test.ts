@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { insideOf, laneOf, roomById, SPOTS } from "./layout.ts";
-import { buildPath } from "./walk.ts";
+import { buildPath, zoneAt } from "./walk.ts";
 
 describe("buildPath", () => {
   it("di ruangan yang sama langsung ke tujuan", () => {
@@ -11,6 +11,13 @@ describe("buildPath", () => {
     const pm = roomById("pm")!;
     const qa = roomById("qa-testing")!;
     expect(buildPath("pm", "qa-testing", [9, 9])).toEqual([insideOf(pm), laneOf(pm), laneOf(qa), insideOf(qa), [9, 9]]);
+  });
+
+  it("zona dari posisi fisik", () => {
+    const pm = roomById("pm")!;
+    expect(zoneAt(pm.x, pm.z)).toBe("pm");
+    expect(zoneAt(pm.x, 0)).toBe("hall");
+    expect(zoneAt(SPOTS.pantry[0], SPOTS.pantry[1])).toBe("hall");
   });
 
   it("ke pantry berakhir di titik pantry", () => {
