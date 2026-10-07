@@ -66,3 +66,17 @@ describe("assessPermission", () => {
     expect(assessPermission(rules, ws, "edit", ["src/opencode-notes.md"]).allowed).toBe(true);
   });
 });
+
+describe("perintah baca-saja", () => {
+  const policy = new RiskPolicy();
+  it("cek versi dan daftar folder kerja otomatis diizinkan", () => {
+    for (const cmd of ["node -v", "npm --version", "python3 --version", "ls", "dir", "ls -la", "pwd"]) {
+      expect(policy.assessBashCommand(cmd).allowed, cmd).toBe(true);
+    }
+  });
+  it("yang mirip tapi punya efek tetap ditanya atau ditolak", () => {
+    expect(policy.assessBashCommand("node -v && rm -rf build").allowed).toBe(false);
+    expect(policy.assessBashCommand("ls ../../").allowed).toBe(false);
+    expect(policy.assessBashCommand("dir C:\\Users").allowed).toBe(false);
+  });
+});

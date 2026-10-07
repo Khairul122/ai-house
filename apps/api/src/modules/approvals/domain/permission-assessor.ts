@@ -43,6 +43,11 @@ export function assessPermission(
     case "todowrite":
     case "todoread":
       return allow(0, "Catatan internal agen.");
+    case "skill":
+      return allow(0, "Memuat panduan skill (hanya instruksi).");
+    case "task":
+      // Sub-agen berjalan di session anak yang izinnya tidak terlihat House; agen harus bekerja langsung.
+      return deny("Sub-agen tidak diizinkan di House. Kerjakan langsung.");
     default:
       // Aksi yang belum dikenal (mis. akses folder luar) selalu ditanyakan.
       return ask(`Aksi "${permission}" belum dikenal kebijakan, butuh keputusan manusia.`);

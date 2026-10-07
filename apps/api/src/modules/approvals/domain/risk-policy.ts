@@ -26,6 +26,12 @@ export class RiskPolicy {
     /ssh\s+/i
   ];
 
+  // Perintah baca-saja tanpa efek samping: cek versi alat dan melihat isi folder kerja.
+  private readonly readOnlyPatterns = [
+    /^(node|npm|pnpm|npx|yarn|bun|deno|python3?|pip3?|git|java|go|cargo|rustc)\s+(-v|-V|--version|version)$/i,
+    /^(ls|dir|pwd|whoami)(\s+(-[a-z]+|\.|\.\/))*$/i
+  ];
+
   assessBashCommand(
     command: string,
     customAllow: string[] = [],
@@ -62,7 +68,7 @@ export class RiskPolicy {
 
     // Check custom allow or safe patterns (Level 2)
     const isCustomAllow = customAllow.some((pattern) => this.matchWildcard(trimmed, pattern));
-    if (isCustomAllow || /^git\s+(status|diff|log)/i.test(trimmed)) {
+    if (isCustomAllow || /^git\s+(status|diff|log)/i.test(trimmed) || this.readOnlyPatterns.some((p) => p.test(trimmed))) {
       return {
         riskLevel: 2,
         allowed: true,

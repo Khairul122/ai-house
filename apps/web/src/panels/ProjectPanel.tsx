@@ -32,6 +32,47 @@ const TASK_STATUS: Record<string, [string, string]> = {
 
 const PLAN_TASK = "Menyusun rencana proyek";
 
+interface WorkFile {
+  path: string;
+  size: number;
+}
+
+const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
+const fileUrl = (projectId: string, p: string) => `/api/projects/${projectId}/files/${p.split("/").map(encodeURIComponent).join("/")}`;
+
+// Berkas yang dibuat divisi di workspace proyek. Halaman HTML dibuka di tab baru (terisolasi).
+function WorkFiles({ projectId, refreshKey }: { projectId: string; refreshKey: number }) {
+  const { data } = useFetch<WorkFile[]>(`/api/projects/${projectId}/files`, refreshKey);
+  if (!data?.length) return null;
+  const entry = data.find((f) => f.path === "index.html") ?? data.find((f) => f.path.endsWith("/index.html"));
+
+  return (
+    <section className="mt-5">
+      <h3 className="text-sm font-semibold text-ink mb-2">Hasil kerja</h3>
+      {entry && (
+        <a href={fileUrl(projectId, entry.path)} target="_blank" rel="noreferrer" className="btn btn-primary inline-block mb-3">
+          Buka halaman hasil
+        </a>
+      )}
+      <ul className="divide-y divide-line border-y border-line">
+        {data.map((f) => (
+          <li key={f.path}>
+            <a
+              href={fileUrl(projectId, f.path)}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-between gap-3 py-2 px-1 hover:bg-line/20"
+            >
+              <span className="font-mono text-xs text-ink truncate">{f.path}</span>
+              <span className="text-xs text-ink-muted tabular-nums shrink-0">{kb(f.size)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function TaskRow({ t, titleOf, onRetry, busy }: { t: Task; titleOf: (id: string) => string; onRetry: () => void; busy: boolean }) {
   const nameOf = useDivisionName();
   const [label, tone] = TASK_STATUS[t.status] ?? [t.status, ""];
@@ -188,6 +229,8 @@ export function ProjectPanel() {
           ))}
         </ol>
       )}
+
+      <WorkFiles projectId={project.id} refreshKey={version} />
 
       {project.tokensUsed > 0 && (
         <p className="text-xs text-ink-muted mt-3 tabular-nums">Token terpakai: {project.tokensUsed.toLocaleString("id-ID")}</p>

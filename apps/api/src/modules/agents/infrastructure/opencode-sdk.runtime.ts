@@ -49,7 +49,7 @@ export class OpenCodeSdkRuntime implements AgentRuntime {
     const sessionID = this.sessionOf.get(runId);
     if (!sessionID) return;
     await this.api("POST", `/api/session/${sessionID}/permission/${permissionId}/reply`, {
-      reply: decision === "allow" ? "once" : "reject"
+      decision: decision === "allow" ? "once" : "reject"
     });
   }
 
@@ -135,16 +135,36 @@ export class OpenCodeSdkRuntime implements AgentRuntime {
   }
 
   private async handle(raw: string) {
-    const ev = JSON.parse(raw) as { type: string; data?: any; properties?: any };
+    const ev = JSON.parse(raw) as { type: string; aggregateID?: string; data?: any; properties?: any };
     const d = ev.data ?? ev.properties ?? {};
-    const sessionID: string | undefined = d.sessionID ?? d.part?.sessionID;
+    const sessionID: string | undefined = d.sessionID ?? ev.aggregateID ?? d.part?.sessionID;
     const runId = sessionID ? this.runOf.get(sessionID) : undefined;
     if (!sessionID || !runId) return;
 
     switch (ev.type) {
       case "permission.asked":
+        // v2 server: { action, resources }; skema lama: { permission, patterns }
         this.busy.add(sessionID);
-        await this.emit(runId, { type: "permission", permissionId: d.id, permission: d.permission, patterns: d.patterns ?? [] });
+        await this.emit(runId, {
+          type: "permission",
+          permissionId: d.id,
+          permission: d.action ?? d.permission ?? "unknown",
+          patterns: d.resources ?? d.patterns ?? []
+        });
+        return;
+      case "session.execution.started":
+        this.busy.add(sessionID);
+        return;
+      case "session.execution.succeeded":
+        await this.finish(runId, sessionID);
+        return;
+      case "session.execution.failed":
+        await this.emit(runId, { type: "error", message: d.error?.message ?? d.error?.data?.message ?? "Eksekusi OpenCode gagal." });
+        this.forget(runId);
+        return;
+      case "session.execution.interrupted":
+        await this.emit(runId, { type: "error", message: "Run dihentikan." });
+        this.forget(runId);
         return;
       case "session.error":
         await this.emit(runId, { type: "error", message: d.error?.data?.message ?? d.error?.name ?? "OpenCode melaporkan kesalahan." });
@@ -210,27 +230,19 @@ export function writeWorkspaceConfig(workspace: string, model: string) {
   fs.writeFileSync(path.join(workspace, "opencode.json"), JSON.stringify(config, null, 2));
 }
 
-// Ambil teks balasan asisten terakhir dari daftar pesan, apa pun bentuk persisnya.
+// Teks jawaban langsung asisten yang terakhir. Keluaran alat (isi skill, "Wrote file ...") diabaikan.
 export function lastAssistantText(messages: unknown): string {
   const list = Array.isArray(messages) ? messages : [];
   for (let i = list.length - 1; i >= 0; i--) {
     const m = list[i] as any;
-    const role = m?.role ?? m?.type ?? m?.info?.role;
-    if (role !== "assistant") continue;
-    const texts: string[] = [];
-    collectText(m, texts);
-    const text = texts.join("\n").trim();
+    if ((m?.role ?? m?.type ?? m?.info?.role) !== "assistant") continue;
+    const parts = (m.content ?? m.parts ?? []) as { type?: string; text?: string }[];
+    const text = parts
+      .filter((c) => c?.type === "text" && typeof c.text === "string")
+      .map((c) => c.text)
+      .join("\n")
+      .trim();
     if (text) return text;
   }
   return "";
-}
-
-function collectText(node: unknown, out: string[]) {
-  if (Array.isArray(node)) {
-    for (const n of node) collectText(n, out);
-  } else if (node && typeof node === "object") {
-    const o = node as Record<string, unknown>;
-    if (o.type === "text" && typeof o.text === "string") out.push(o.text);
-    else for (const v of Object.values(o)) collectText(v, out);
-  }
 }

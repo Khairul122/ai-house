@@ -48,6 +48,8 @@ export class OrchestratorService implements OnModuleInit {
   async onModuleInit() {
     this.listen();
     await this.recoverAfterRestart();
+    // Proyek yang sedang berjalan saat server mati dinilai ulang: lanjut, atau ditandai gagal agar bisa dicoba lagi.
+    void this.tickAll();
   }
 
   // Keputusan persetujuan (dari mana pun) diteruskan ke run yang menunggunya.
@@ -246,7 +248,13 @@ Bekerjalah hanya di dalam folder kerja ini. Akhiri dengan ringkasan singkat hasi
       };
 
       this.runtime.onEvent(runId, async (ev: RunEvent) => {
-        if (ev.type === "permission") await this.onPermission(runId, task, division, project.workspacePath, ev);
+        if (ev.type === "permission") {
+          // Galat saat menilai izin tidak boleh membuat agen menunggu selamanya: tolak saja.
+          await this.onPermission(runId, task, division, project.workspacePath, ev).catch(async (e) => {
+            console.error("Gagal memproses izin, ditolak:", e);
+            await this.runtime.respondPermission(runId, ev.permissionId, "deny").catch(() => {});
+          });
+        }
         else if (ev.type === "usage") {
           await db.update(runs).set({ tokensIn: ev.tokensIn, tokensOut: ev.tokensOut }).where(eq(runs.id, runId));
           await db.update(projects).set({ tokensUsed: sql`${projects.tokensUsed} + ${ev.tokensIn + ev.tokensOut}` }).where(eq(projects.id, task.projectId));
@@ -272,7 +280,7 @@ Bekerjalah hanya di dalam folder kerja ini. Akhiri dengan ringkasan singkat hasi
 
   private async onPermission(runId: string, task: Task, division: DivisionEntity, workspace: string, ev: Extract<RunEvent, { type: "permission" }>) {
     const verdict = assessPermission(division.permission, workspace, ev.permission, ev.patterns);
-    const summary = ev.permission === "bash" ? ev.patterns.join(" && ") : `${ev.permission}: ${ev.patterns.join(", ")}`;
+    const summary = ev.permission === "bash" || ev.permission === "shell" ? ev.patterns.join(" && ") : `${ev.permission}: ${ev.patterns.join(", ")}`;
 
     if (verdict.allowed) return this.runtime.respondPermission(runId, ev.permissionId, "allow");
     if (!verdict.requiresApproval) {

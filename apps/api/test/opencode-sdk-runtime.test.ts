@@ -32,17 +32,18 @@ describe("OpenCodeSdkRuntime", () => {
           // status idle awal (sebelum sibuk) harus diabaikan
           setTimeout(() => {
             push("session.status", { sessionID: "ses_1", status: { type: "idle" } });
-            push("session.status", { sessionID: "ses_1", status: { type: "busy" } });
-            push("permission.asked", { id: "per_1", sessionID: "ses_1", permission: "bash", patterns: ["npm install"], metadata: {}, always: [] });
+            push("session.execution.started", { sessionID: "ses_1" });
+            // bentuk asli server v2 (diamati dari opencode serve 2.0.16)
+            push("permission.asked", { id: "per_1", sessionID: "ses_1", action: "shell", resources: ["npm install"], save: ["npm install *"], source: { type: "tool" } });
           }, 10);
         } else if (req.url === "/api/session/ses_1/permission/per_1/reply") {
           json({});
-          setTimeout(() => push("session.idle", { sessionID: "ses_1" }), 10);
+          setTimeout(() => push("session.execution.succeeded", { sessionID: "ses_1" }), 10);
         } else if (req.url === "/api/session/ses_1") json({ tokens: { input: 120, output: 45 } });
         else if (req.url === "/api/session/ses_1/message") {
           json([
-            { role: "user", parts: [{ type: "text", text: "Tugas" }] },
-            { role: "assistant", parts: [{ type: "reasoning", text: "x" }, { type: "text", text: "Halaman selesai dibuat." }] }
+            { id: "msg_0", text: "Tugas" },
+            { id: "msg_1", type: "assistant", content: [{ type: "tool", name: "shell" }, { type: "text", text: "Halaman selesai dibuat." }] }
           ]);
         } else res.writeHead(404).end();
       });
@@ -83,7 +84,7 @@ describe("OpenCodeSdkRuntime", () => {
     await done;
 
     expect(events).toEqual([
-      { type: "permission", permissionId: "per_1", permission: "bash", patterns: ["npm install"] },
+      { type: "permission", permissionId: "per_1", permission: "shell", patterns: ["npm install"] },
       { type: "usage", tokensIn: 120, tokensOut: 45 },
       { type: "done", summary: "Halaman selesai dibuat." }
     ]);
@@ -96,7 +97,7 @@ describe("OpenCodeSdkRuntime", () => {
     expect(cfg.permissions.every((r: { effect: string }) => r.effect === "ask")).toBe(true);
     expect(cfg.permissions.map((r: { action: string }) => r.action)).toContain("shell");
     fs.rmSync(ws, { recursive: true, force: true });
-    expect(JSON.parse(seen.find((s) => s.url.endsWith("/reply"))!.body)).toEqual({ reply: "once" });
+    expect(JSON.parse(seen.find((s) => s.url.endsWith("/reply"))!.body)).toEqual({ decision: "once" });
     expect(seen[0].auth).toBe(`Basic ${Buffer.from("opencode:rahasia").toString("base64")}`);
   });
 });
