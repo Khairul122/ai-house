@@ -9,6 +9,8 @@ import { ApprovalsPanel } from "../panels/ApprovalsPanel.tsx";
 import { DivisionPanel, DivisionsPanel } from "../panels/DivisionsPanel.tsx";
 import { ProjectPanel } from "../panels/ProjectPanel.tsx";
 import { ProjectsPanel } from "../panels/ProjectsPanel.tsx";
+import { ReportPanel, ReportsPanel } from "../panels/ReportsPanel.tsx";
+import { useEnvironmentClock } from "../state/env.ts";
 import { useLiveOffice } from "../state/store.ts";
 
 const OfficeCanvas = lazy(() => import("../features/office/OfficeCanvas.tsx"));
@@ -23,6 +25,7 @@ function hasWebGL(): boolean {
 
 function Shell() {
   useLiveOffice();
+  useEnvironmentClock();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const selectedId = useMatch("/divisions/:id")?.params.id ?? null;
@@ -55,6 +58,8 @@ function Shell() {
         <Route path="/" element={null} />
         <Route path="/projects" element={<ProjectsPanel />} />
         <Route path="/projects/:id" element={<ProjectPanel />} />
+        <Route path="/reports" element={<ReportsPanel />} />
+        <Route path="/reports/:id" element={<ReportPanel />} />
         <Route path="/approvals" element={<ApprovalsPanel />} />
         <Route path="/activity" element={<ActivityPanel />} />
         <Route path="/divisions" element={<DivisionsPanel />} />

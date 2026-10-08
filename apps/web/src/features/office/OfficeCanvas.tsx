@@ -1,5 +1,6 @@
 import { CameraControls, Html } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
+import { Bloom, EffectComposer, N8AO, Vignette } from "@react-three/postprocessing";
 import { useEffect, useRef } from "react";
 import { Atmosphere } from "./Atmosphere.tsx";
 import { Campus } from "./Campus.tsx";
@@ -103,6 +104,28 @@ function Commons({ onOpenProjects }: { onOpenProjects: () => void }) {
   );
 }
 
+// Sentuhan akhir: bayangan lembut di sela benda (AO), cahaya lampu sedikit berpendar, tepi layar sedikit gelap.
+// AO dimatikan di layar sempit agar tetap ringan di ponsel.
+function Effects() {
+  const { size } = useThree();
+  const light = size.width < 768;
+  if (light) {
+    return (
+      <EffectComposer multisampling={0} enableNormalPass={false}>
+        <Bloom luminanceThreshold={0.82} luminanceSmoothing={0.2} intensity={0.55} mipmapBlur />
+        <Vignette offset={0.3} darkness={0.42} />
+      </EffectComposer>
+    );
+  }
+  return (
+    <EffectComposer multisampling={4} enableNormalPass={false}>
+      <N8AO aoRadius={1.4} intensity={2.4} distanceFalloff={1.2} halfRes />
+      <Bloom luminanceThreshold={0.82} luminanceSmoothing={0.2} intensity={0.55} mipmapBlur />
+      <Vignette offset={0.3} darkness={0.42} />
+    </EffectComposer>
+  );
+}
+
 export default function OfficeCanvas(props: OfficeProps) {
   const { selectedId, onSelect, reducedMotion, onOpenProjects } = props;
   return (
@@ -129,6 +152,7 @@ export default function OfficeCanvas(props: OfficeProps) {
       <Campus />
 
       <CameraRig {...props} />
+      <Effects />
     </Canvas>
   );
 }

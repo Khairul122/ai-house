@@ -1,21 +1,25 @@
-import { CheckSquare, FolderKanban, History, Users } from "lucide-react";
+import { CheckSquare, FileText, FolderKanban, History, Users } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useAutonomy } from "../state/autonomy.ts";
 import { useOffice } from "../state/store.ts";
-
-const ITEMS = [
-  { label: "Proyek", path: "/projects", icon: FolderKanban },
-  { label: "Persetujuan", path: "/approvals", icon: CheckSquare },
-  { label: "Aktivitas", path: "/activity", icon: History },
-  { label: "Divisi", path: "/divisions", icon: Users }
-];
 
 export function BottomNav() {
   const { pathname } = useLocation();
   const pending = useOffice((s) => Object.values(s.agents).filter((a) => a.approval).length);
+  const mode = useAutonomy();
+
+  // Mode otomatis: Persetujuan hanya muncul bila memang ada yang menunggu.
+  const items = [
+    { label: "Proyek", path: "/projects", icon: FolderKanban },
+    { label: "Laporan", path: "/reports", icon: FileText },
+    ...(mode === "ask" || pending > 0 ? [{ label: "Persetujuan", path: "/approvals", icon: CheckSquare }] : []),
+    { label: "Aktivitas", path: "/activity", icon: History },
+    { label: "Divisi", path: "/divisions", icon: Users }
+  ];
 
   return (
     <nav className="dock" aria-label="Panel utama">
-      {ITEMS.map(({ label, path, icon: Icon }) => {
+      {items.map(({ label, path, icon: Icon }) => {
         const active = pathname.startsWith(path);
         return (
           <Link
