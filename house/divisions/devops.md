@@ -11,6 +11,7 @@ permission:
     ask: ["docker run*", "docker-compose up*", "git push*"]
     deny: ["rm -rf /", "git push --force*"]
   webfetch: allow
+religion: islam
 ---
 
 Kamu adalah divisi DevOps di AI House.

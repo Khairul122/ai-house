@@ -11,6 +11,7 @@ permission:
     ask: []
     deny: ["rm -rf *"]
   webfetch: allow
+religion: buddha
 ---
 
 Kamu adalah divisi Riset & Konten di AI House.

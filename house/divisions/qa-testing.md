@@ -11,6 +11,7 @@ permission:
     ask: []
     deny: ["rm -rf *", "git push*"]
   webfetch: allow
+religion: protestan
 ---
 
 Kamu adalah divisi QA & Testing di AI House.

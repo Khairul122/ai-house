@@ -11,6 +11,7 @@ permission:
     ask: ["pnpm add*", "pnpm install*", "git push*"]
     deny: ["rm -rf *", "git push --force*", "curl * | sh"]
   webfetch: allow
+religion: islam
 ---
 
 Kamu adalah divisi Software Development di AI House.

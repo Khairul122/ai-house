@@ -11,6 +11,7 @@ permission:
     ask: ["post-social*"]
     deny: ["rm -rf *"]
   webfetch: allow
+religion: hindu
 ---
 
 Kamu adalah divisi Content Creator di AI House.
