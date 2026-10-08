@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { ErrorNote, PanelShell } from "../components/PanelShell.tsx";
+import { ErrorNote, Loading, PanelShell } from "../components/PanelShell.tsx";
 import { timeAgo, useFetch } from "../lib/hooks.ts";
 import { useCoordinatorLabel, useLook } from "../features/office/looks.ts";
 import type { AgentState, AgentStatus } from "../state/reduce.ts";
@@ -136,7 +136,7 @@ function DivisionWork({ id }: { id: string }) {
   const version = useOffice((s) => s.version);
   const { data, error } = useFetch<WorkItem[]>(`/api/divisions/${id}/tasks`, version);
   if (error) return <ErrorNote>{error}</ErrorNote>;
-  if (!data) return <p className="text-sm text-ink-muted">Memuat pekerjaan…</p>;
+  if (!data) return <Loading label="Memuat pekerjaan" />;
   if (!data.length) {
     return <p className="text-sm text-ink-muted">Belum ada tugas. Tugas muncul di sini setelah {lead} membagi rencana proyek ke divisi ini.</p>;
   }

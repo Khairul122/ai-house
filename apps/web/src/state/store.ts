@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { getRooms, type RoomDef, setRoomOrder } from "../features/office/layout.ts";
 import { fetchJson } from "../lib/api.ts";
 import { playEventSound } from "../lib/sound.ts";
+import { push, toastFor } from "./notify.ts";
 import { initialState, reduce, type OfficeEvent, type OfficeState, type SnapshotItem } from "./reduce.ts";
 
 let state: OfficeState = initialState;
@@ -157,6 +158,8 @@ export function useLiveOffice() {
         const event = JSON.parse(m.data) as OfficeEvent;
         office.send(event);
         playEventSound(event);
+        const toast = toastFor(event, divisionName);
+        if (toast) push(toast);
       } catch {
         // abaikan pesan yang bukan JSON
       }
@@ -164,6 +167,8 @@ export function useLiveOffice() {
     return () => es.close();
   }, []);
 }
+
+const divisionName = (id: string | null | undefined) => divisions.find((d) => d.id === id)?.name ?? id ?? "Sistem";
 
 export function useDivisionName() {
   const list = useDivisions();

@@ -14,11 +14,6 @@ describe("workspaceFor", () => {
     expect(dir).toBe(path.join(path.resolve("D:/real-aihouse"), "landing-page-kopi-senja-bemcz3"));
   });
 
-  it("proyek demo tetap di folder internal", () => {
-    process.env.WORKSPACES_DIR = "D:/real-aihouse";
-    expect(workspaceFor("01ABCDEF", "Demo: x", true).startsWith(path.resolve("./workspaces"))).toBe(true);
-  });
-
   it("judul tanpa huruf latin tetap mendapat nama", () => {
     process.env.WORKSPACES_DIR = "D:/real-aihouse";
     expect(path.basename(workspaceFor("01ABCDEF", "!!!"))).toBe("proyek-abcdef");

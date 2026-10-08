@@ -1,8 +1,12 @@
-import React, { lazy, Suspense, useMemo } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 import { BottomNav } from "../components/BottomNav.tsx";
+import { CommandPalette } from "../components/CommandPalette.tsx";
 import { Hud } from "../components/Hud.tsx";
+import { Roster } from "../components/Roster.tsx";
+import { Toasts } from "../components/Toasts.tsx";
 import { Fallback2D } from "../features/office/Fallback2D.tsx";
+import { isTyping } from "../lib/fullscreen.ts";
 import { useReducedMotion } from "../lib/hooks.ts";
 import { ActivityPanel } from "../panels/ActivityPanel.tsx";
 import { ApprovalsPanel } from "../panels/ApprovalsPanel.tsx";
@@ -11,7 +15,7 @@ import { ProjectPanel } from "../panels/ProjectPanel.tsx";
 import { ProjectsPanel } from "../panels/ProjectsPanel.tsx";
 import { ReportPanel, ReportsPanel } from "../panels/ReportsPanel.tsx";
 import { useEnvironmentClock } from "../state/env.ts";
-import { useLiveOffice } from "../state/store.ts";
+import { getDivisions, useLiveOffice } from "../state/store.ts";
 
 const OfficeCanvas = lazy(() => import("../features/office/OfficeCanvas.tsx"));
 
@@ -33,6 +37,33 @@ function Shell() {
   const webgl = useMemo(hasWebGL, []);
 
   const select = (id: string) => navigate(`/divisions/${id}`);
+  const [palette, setPalette] = useState(false);
+
+  // Pintasan global: Ctrl K atau / membuka palet, angka memilih divisi, [ dan ] berpindah divisi.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPalette((o) => !o);
+        return;
+      }
+      if (isTyping(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+      const ids = getDivisions().map((d) => d.id);
+      if (e.key === "/" || e.key === "?") {
+        e.preventDefault();
+        setPalette(true);
+      } else if (/^[0-9]$/.test(e.key)) {
+        const id = ids[e.key === "0" ? 9 : Number(e.key) - 1];
+        if (id) navigate(`/divisions/${id}`);
+      } else if ((e.key === "[" || e.key === "]") && ids.length) {
+        const at = selectedId ? ids.indexOf(selectedId) : -1;
+        const step = e.key === "]" ? 1 : -1;
+        navigate(`/divisions/${ids[(at + step + ids.length) % ids.length]}`);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navigate, selectedId]);
 
   return (
     <div className="app">
@@ -52,7 +83,8 @@ function Shell() {
         )}
       </main>
 
-      <Hud selectedId={selectedId} />
+      <Hud onOpenPalette={() => setPalette(true)} />
+      <Roster selectedId={selectedId} />
 
       <Routes>
         <Route path="/" element={null} />
@@ -68,6 +100,8 @@ function Shell() {
       </Routes>
 
       <BottomNav />
+      <Toasts />
+      <CommandPalette open={palette} onClose={() => setPalette(false)} />
     </div>
   );
 }

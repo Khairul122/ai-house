@@ -32,7 +32,7 @@ describe("Orkestrasi proyek (runtime tiruan)", () => {
     const { ApprovalService } = await import("../src/modules/approvals/application/approval.service.js");
     const { ProjectService } = await import("../src/modules/projects/application/project.service.js");
     const { TaskService } = await import("../src/modules/tasks/application/task.service.js");
-    const { FakeAgentRuntime } = await import("../src/modules/agents/infrastructure/fake-agent.runtime.js");
+    const { FakeAgentRuntime } = await import("./support/fake-agent.runtime.js");
     const { FileDivisionRepository } = await import("../src/modules/divisions/infrastructure/file-division.repository.js");
 
     const audit = new AuditService();

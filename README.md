@@ -65,7 +65,7 @@ schtasks /Create /TN "AI House" /SC ONLOGON /TR "powershell -ExecutionPolicy Byp
 
 Pilih model atau kombo 9router per divisi di dashboard (panel Divisi). Pilihan disimpan ke `house/divisions/<id>.md`.
 
-Untuk mencoba alur tanpa model, set `AGENT_RUNTIME=fake`. PM membuat rencana tiruan, dan divisi Dev meminta izin `npm install express` supaya alur persetujuan bisa dicoba.
+Dashboard hanya menampilkan data nyata dari server. Tidak ada mode demo atau data tiruan; runtime tiruan hanya dipakai di tes (`apps/api/test/support`).
 
 ## Alur proyek
 

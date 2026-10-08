@@ -1,4 +1,5 @@
-import { ErrorNote, PanelShell } from "../components/PanelShell.tsx";
+import { ShieldCheck } from "lucide-react";
+import { Empty, ErrorNote, Loading, PanelShell } from "../components/PanelShell.tsx";
 import { useFetch } from "../lib/hooks.ts";
 import { useDivisionName, useOffice } from "../state/store.ts";
 import { ApprovalCard } from "./ApprovalCard.tsx";
@@ -19,8 +20,11 @@ export function ApprovalsPanel() {
   return (
     <PanelShell title="Persetujuan" subtitle="Aksi berisiko berhenti di sini sampai Anda memutuskan.">
       {error && <ErrorNote>{error}</ErrorNote>}
+      {!data && !error && <Loading label="Memuat persetujuan" />}
       {data?.length === 0 && (
-        <p className="text-sm text-ink-muted">Tidak ada yang menunggu. Saat divisi butuh izin, karakternya mengangkat tangan dan tanda ! muncul di atas kepalanya.</p>
+        <Empty icon={ShieldCheck} title="Tidak ada yang menunggu">
+          Saat divisi butuh izin, karakternya mengangkat tangan dan notifikasi muncul di atas layar.
+        </Empty>
       )}
       <div className="space-y-3">
         {data?.map((r) => (

@@ -1,6 +1,6 @@
 import React, { useId, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ErrorNote, PanelShell } from "../components/PanelShell.tsx";
+import { ErrorNote, Loading, PanelShell } from "../components/PanelShell.tsx";
 import { lookOf, useCoordinatorLabel } from "../features/office/looks.ts";
 import { postJson, timeAgo, useFetch } from "../lib/hooks.ts";
 import { useAutonomy } from "../state/autonomy.ts";
@@ -230,6 +230,7 @@ export function ProjectsPanel() {
 
       <h3 className="text-sm font-semibold text-ink mb-1">Semua proyek</h3>
       {error && <ErrorNote>{error}</ErrorNote>}
+      {!data && !error && <Loading label="Memuat proyek" />}
       {data?.length === 0 && <p className="text-sm text-ink-muted">Belum ada proyek. Isi formulir di atas untuk membuat yang pertama.</p>}
       <ul className="divide-y divide-line border-y border-line">
         {data?.map((p) => (

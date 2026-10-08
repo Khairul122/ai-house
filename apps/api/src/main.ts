@@ -9,12 +9,15 @@ import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { AppModule } from "./app.module.js";
 import { migrateDb } from "./db/migrate.js";
+import { purgeDemoData } from "./db/purge-demo.js";
 
 // Hasil build dashboard (pnpm build). Bila ada, API ikut menyajikannya: satu proses untuk produksi.
 const webDist = [path.resolve("apps/web/dist"), path.resolve("../web/dist")].find((d) => fs.existsSync(path.join(d, "index.html")));
 
 async function bootstrap() {
   await migrateDb();
+  const purged = await purgeDemoData();
+  if (purged) console.log(`${purged} proyek demo lama dihapus.`);
 
   const adapter = new FastifyAdapter({
     logger: false,

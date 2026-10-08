@@ -8,10 +8,9 @@ import { projects } from "../../../db/schema/index.js";
 import { AuditService } from "../../audit/audit.service.js";
 import { EventBusService } from "../../events/event-bus.service.js";
 
-// Proyek nyata disimpan di WORKSPACES_DIR (mis. D:\real-aihouse) dengan nama folder yang mudah dikenali.
-// Proyek demo tetap di folder internal agar tidak bercampur dengan hasil kerja sungguhan.
-export function workspaceFor(id: string, title: string, demo = false) {
-  const base = !demo && process.env.WORKSPACES_DIR ? path.resolve(process.env.WORKSPACES_DIR) : path.resolve("./workspaces");
+// Proyek disimpan di WORKSPACES_DIR (mis. D:\real-aihouse) dengan nama folder yang mudah dikenali.
+export function workspaceFor(id: string, title: string) {
+  const base = process.env.WORKSPACES_DIR ? path.resolve(process.env.WORKSPACES_DIR) : path.resolve("./workspaces");
   const slug = title
     .toLowerCase()
     .normalize("NFKD")
@@ -30,9 +29,9 @@ export class ProjectService {
     private readonly eventBus: EventBusService
   ) {}
 
-  async createProject(title: string, goal: string, tokenBudget?: number, options: { demo?: boolean } = {}) {
+  async createProject(title: string, goal: string, tokenBudget?: number) {
     const id = ulid();
-    const workspacePath = workspaceFor(id, title, options.demo);
+    const workspacePath = workspaceFor(id, title);
 
     if (!fs.existsSync(workspacePath)) {
       fs.mkdirSync(workspacePath, { recursive: true });

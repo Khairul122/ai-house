@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { AgentRuntime, RunEvent, StartRunInput } from "../domain/agent-runtime.port.js";
+import type { AgentRuntime, RunEvent, StartRunInput } from "../../src/modules/agents/domain/agent-runtime.port.js";
 
 // Prompt perencanaan memuat daftar divisi tujuan ("- id: deskripsi") setelah baris penanda ini.
 const PLAN_MARKER = "divisionId wajib salah satu dari:";
@@ -15,7 +15,7 @@ function planTargets(prompt: string): string[] | null {
     .filter((id): id is string => !!id);
 }
 
-// Runtime tiruan untuk tes dan pengembangan tanpa model. Tugas perencanaan dikenali dari prompt-nya,
+// Runtime tiruan khusus tes (tidak dipakai aplikasi). Tugas perencanaan dikenali dari prompt-nya,
 // jadi rencana selalu memakai divisi yang benar-benar ada. Divisi di `askFor` meminta izin
 // menjalankan perintah bash dan baru selesai setelah izin dijawab.
 export class FakeAgentRuntime implements AgentRuntime {

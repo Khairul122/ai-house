@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { type LucideIcon, X } from "lucide-react";
 import React, { useEffect, useId, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -38,6 +38,29 @@ export function PanelShell({ title, subtitle, children }: Props) {
       </header>
       <div className="panel-body">{children}</div>
     </aside>
+  );
+}
+
+// Kerangka abu-abu selama data dimuat, menggantikan teks "Memuat…".
+export function Loading({ label }: { label: string }) {
+  return (
+    <div className="skeleton" role="status" aria-label={label}>
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
+export function Empty({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children?: React.ReactNode }) {
+  return (
+    <div className="empty">
+      <span className="empty-icon" aria-hidden>
+        <Icon className="w-5 h-5" />
+      </span>
+      <p className="font-semibold text-ink">{title}</p>
+      {children && <p className="max-w-xs">{children}</p>}
+    </div>
   );
 }
 

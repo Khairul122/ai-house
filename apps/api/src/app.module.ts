@@ -11,7 +11,6 @@ import { ProjectService } from "./modules/projects/application/project.service.j
 import { ProjectsController } from "./modules/projects/http/projects.controller.js";
 import { WorkspaceFilesController } from "./modules/projects/http/workspace-files.controller.js";
 import { TaskService } from "./modules/tasks/application/task.service.js";
-import { DemoController } from "./modules/office/demo.controller.js";
 import { OfficeController } from "./modules/office/office.controller.js";
 import { OrchestratorService } from "./modules/orchestrator/orchestrator.service.js";
 import { TelegramBotService } from "./modules/telegram/bot.service.js";
@@ -24,8 +23,7 @@ import { TelegramBotService } from "./modules/telegram/bot.service.js";
     WorkspaceFilesController,
     ApprovalsController,
     EventsController,
-    OfficeController,
-    DemoController
+    OfficeController
   ],
   providers: [
     AuditService,

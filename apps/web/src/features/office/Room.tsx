@@ -3,6 +3,8 @@ import { type ThreeEvent, useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import { type Mesh, Vector3 } from "three";
 import type { AgentStatus } from "../../state/reduce.ts";
+import { STATUS_LABEL } from "../../panels/DivisionsPanel.tsx";
+import { useDivisionName } from "../../state/store.ts";
 import { useAgentStatus } from "../../state/useAgentStatus.ts";
 import { ROOM_D, ROOM_W, type RoomDef, WALL_H } from "./layout.ts";
 import { lookOf, MAT, type Signature as SignatureKind, useLook } from "./looks.ts";
@@ -180,7 +182,8 @@ interface RoomProps {
 }
 
 export function Room({ room, selected, onSelect, onBoard }: RoomProps) {
-  const { status } = useAgentStatus(room.id);
+  const { status, agent } = useAgentStatus(room.id);
+  const nameOf = useDivisionName();
   const [hover, setHover] = useState(false);
   const look = useLook(room.id);
   const fixed = STATIC_SIGNATURE.has(look.signature);
@@ -263,6 +266,15 @@ export function Room({ room, selected, onSelect, onBoard }: RoomProps) {
           <div className={`room-sign${selected ? " is-selected" : ""}`} style={{ borderColor: look.accent }}>
             {look.short}
           </div>
+          {/* kartu singkat saat kursor di atas ruangan: nama divisi, status, dan tugasnya */}
+          {hover && !selected && (
+            <div className="room-peek">
+              <strong>{nameOf(room.id)}</strong>
+              <span className={`tag tag-${status}`}>{STATUS_LABEL[status]}</span>
+              {agent?.task && status !== "idle" && <span className="room-peek-task">{agent.task.title}</span>}
+              <span className="room-peek-hint">Klik untuk mendekat</span>
+            </div>
+          )}
         </Html>
       </group>
     </group>

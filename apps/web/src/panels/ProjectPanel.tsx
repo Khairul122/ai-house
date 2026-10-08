@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ErrorNote, PanelShell } from "../components/PanelShell.tsx";
+import { ErrorNote, Loading, PanelShell } from "../components/PanelShell.tsx";
 import { lookOf, useCoordinatorLabel } from "../features/office/looks.ts";
 import { postJson, useFetch } from "../lib/hooks.ts";
 import { useDivisionName, useIsPlanTask, useOffice } from "../state/store.ts";
@@ -141,7 +141,7 @@ export function ProjectPanel() {
   };
 
   if (!data) {
-    return <PanelShell title="Proyek">{error ? <ErrorNote>{error}</ErrorNote> : <p className="text-sm text-ink-muted">Memuat proyek…</p>}</PanelShell>;
+    return <PanelShell title="Proyek">{error ? <ErrorNote>{error}</ErrorNote> : <Loading label="Memuat proyek" />}</PanelShell>;
   }
 
   const { project, tasks } = data;

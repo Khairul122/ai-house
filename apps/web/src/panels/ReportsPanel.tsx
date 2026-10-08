@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router-dom";
-import { ErrorNote, PanelShell } from "../components/PanelShell.tsx";
+import { FileText } from "lucide-react";
+import { Empty, ErrorNote, Loading, PanelShell } from "../components/PanelShell.tsx";
 import { lookOf, useCoordinatorLabel } from "../features/office/looks.ts";
 import { timeAgo, useFetch } from "../lib/hooks.ts";
 import { useDivisionName, useOffice } from "../state/store.ts";
@@ -40,12 +41,17 @@ export function ReportsPanel() {
   const lead = useCoordinatorLabel();
   const version = useOffice((s) => s.version);
   const { data, error } = useFetch<Project[]>("/api/projects", version);
-  const shown = data?.filter((p) => p.status !== "draft" && !p.title.startsWith("Demo:"));
+  const shown = data?.filter((p) => p.status !== "draft");
 
   return (
     <PanelShell title="Laporan" subtitle="Hasil kerja tiap proyek. Divisi bekerja sendiri; Anda cukup membaca di sini.">
       {error && <ErrorNote>{error}</ErrorNote>}
-      {shown?.length === 0 && <p className="text-sm text-ink-muted">Belum ada laporan. Buat proyek di Resepsionis, {lead} akan langsung merencanakan dan divisi mulai bekerja.</p>}
+      {!data && !error && <Loading label="Memuat laporan" />}
+      {shown?.length === 0 && (
+        <Empty icon={FileText} title="Belum ada laporan">
+          Buat proyek di Resepsionis. {lead} akan langsung merencanakan dan divisi mulai bekerja.
+        </Empty>
+      )}
       <ul className="divide-y divide-line border-y border-line">
         {shown?.map((p) => (
           <li key={p.id}>
@@ -72,7 +78,7 @@ export function ReportPanel() {
   const { data, error } = useFetch<Report>(`/api/projects/${id}/report`, version);
   const nameOf = useDivisionName();
 
-  if (!data) return <PanelShell title="Laporan">{error ? <ErrorNote>{error}</ErrorNote> : <p className="text-sm text-ink-muted">Memuat laporan…</p>}</PanelShell>;
+  if (!data) return <PanelShell title="Laporan">{error ? <ErrorNote>{error}</ErrorNote> : <Loading label="Memuat laporan" />}</PanelShell>;
 
   const { project, tasks, actions, denied } = data;
   const done = tasks.filter((t) => t.status === "done").length;
