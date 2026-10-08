@@ -81,18 +81,23 @@ export function useCoordinatorLabel(): string {
   return id ? lookOf(id).short : "Koordinator";
 }
 
-// Palet material kantor.
+// Empat warna aksen kampus teknologi: biru, merah, kuning, hijau. Dipakai bergantian di ruangan,
+// lantai koridor, sepeda, payung, dan bean bag. Bangunan sendiri tetap putih dan abu-abu terang.
+export const BRAND = ["#4285F4", "#EA4335", "#FBBC05", "#34A853"] as const;
+export const brandAt = (i: number) => BRAND[((i % BRAND.length) + BRAND.length) % BRAND.length];
+
+// Palet material kantor: putih bersih, abu-abu hangat, kayu terang.
 export const MAT = {
-  concrete: "#CFC8BA",
-  corridor: "#BDB3A2",
-  wood: "#C49A6C",
-  woodDark: "#8A6442",
-  wall: "#EFE8DA",
-  wallTop: "#D9CFBC",
-  metal: "#5E6266",
-  screenOff: "#22242A",
-  plant: "#5F7F4A",
-  pot: "#A65E3A",
+  concrete: "#E8EAED",
+  corridor: "#DADCE0",
+  wood: "#D9BC92",
+  woodDark: "#A7825A",
+  wall: "#F4F5F6",
+  wallTop: "#E1E3E6",
+  metal: "#5F6368",
+  screenOff: "#202124",
+  plant: "#2E9D4E",
+  pot: "#F8F9FA",
   // status (hanya tiga warna yang punya arti)
   working: "#D7E6F2",
   waiting: "#E0A030",

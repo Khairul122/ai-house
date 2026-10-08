@@ -3,10 +3,11 @@ import { useEffect, useMemo, useRef } from "react";
 import { CanvasTexture, type MeshStandardMaterial, SRGBColorSpace } from "three";
 import { useHouse } from "../../state/store.ts";
 import { atmo } from "./Atmosphere.tsx";
+import { BRAND } from "./looks.ts";
 import { Box } from "./parts.tsx";
 
-const STONE = "#CFC6B4";
-const STONE_DARK = "#A89E8A";
+const STONE = "#F4F5F6";
+const STONE_DARK = "#DADCE0";
 
 // Nama kantor dipecah dua baris: dua kata terakhir di baris bawah (mis. "Synectra" / "AI House").
 export function splitName(name: string): [string, string] {
@@ -33,12 +34,16 @@ function useInscription(name: string) {
       const canvas = texture.image as HTMLCanvasElement;
       const g = canvas.getContext("2d");
       if (!g) return;
-      g.fillStyle = "#3A3428";
+      // papan putih bersih dengan empat garis warna di atas dan bawah
+      g.fillStyle = "#FFFFFF";
       g.fillRect(0, 0, canvas.width, canvas.height);
-      g.strokeStyle = "#C9A227";
-      g.lineWidth = 10;
-      g.strokeRect(40, 40, canvas.width - 80, canvas.height - 80);
-      g.fillStyle = "#E8D9A8";
+      const band = canvas.width / BRAND.length;
+      BRAND.forEach((c, i) => {
+        g.fillStyle = c;
+        g.fillRect(i * band, 0, band, 36);
+        g.fillRect(i * band, canvas.height - 36, band, 36);
+      });
+      g.fillStyle = "#202124";
       g.textAlign = "center";
       g.textBaseline = "middle";
       const family = '"Bricolage Grotesque", system-ui, sans-serif';
@@ -55,7 +60,10 @@ function useInscription(name: string) {
         fit(bottom, 600, 120);
         g.fillText(bottom, canvas.width / 2, 740);
       }
-      g.fillRect(canvas.width / 2 - 160, 880, 320, 8);
+      BRAND.forEach((c, i) => {
+        g.fillStyle = c;
+        g.fillRect(canvas.width / 2 - 160 + i * 80, 880, 80, 10);
+      });
       texture.needsUpdate = true;
     };
     draw();
@@ -84,12 +92,12 @@ export function Monument({ position, rotation = 0 }: { position: [number, number
       <Box p={[0, 5.35, 0]} s={[2.7, 0.3, 1.35]} c={STONE_DARK} />
       <mesh position={[0, 5.9, 0]} castShadow>
         <coneGeometry args={[0.95, 0.8, 4]} />
-        <meshStandardMaterial color="#C9A227" roughness={0.45} metalness={0.3} />
+        <meshStandardMaterial color={BRAND[0]} roughness={0.45} metalness={0.1} />
       </mesh>
       {/* prasasti di muka depan (+z) */}
       <mesh position={[0, 3.05, 0.56]} userData={{ dynamic: true }}>
         <planeGeometry args={[2.1, 2.62]} />
-        <meshStandardMaterial ref={glow} map={texture} emissive="#E8D9A8" emissiveMap={texture} emissiveIntensity={0.15} roughness={0.8} />
+        <meshStandardMaterial ref={glow} map={texture} emissive="#FFFFFF" emissiveMap={texture} emissiveIntensity={0.15} roughness={0.8} />
       </mesh>
       {/* lampu sorot kecil di kaki tugu */}
       {[-1.3, 1.3].map((x) => (

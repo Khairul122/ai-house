@@ -4,13 +4,13 @@ import { useMemo, useRef } from "react";
 import { ExtrudeGeometry, type Mesh, type MeshStandardMaterial, Shape } from "three";
 import { atmo } from "./Atmosphere.tsx";
 import { CAMPUS_HALF_X, CAMPUS_HALF_Z, LEISURE, LIBRARY, PARK, PLAZA_Z, POOL, PROMENADE_Z, RING_X, WORSHIP, WORSHIP_Z } from "./layout.ts";
-import { MAT } from "./looks.ts";
+import { BRAND, brandAt, MAT } from "./looks.ts";
 import { Monument } from "./Monument.tsx";
 import { StaticBatch } from "./StaticBatch.tsx";
 import { Box, type V3 } from "./parts.tsx";
 
-const GRASS = "#A7B88A";
-const PAVE = "#D9CFBC";
+const GRASS = "#8DC67A";
+const PAVE = "#ECEEF0";
 const GOLD = "#C9A227";
 
 function Sign({ p, text }: { p: V3; text: string }) {
@@ -52,9 +52,86 @@ function Cross({ p, c = "#3B2E24", s = 1 }: { p: V3; c?: string; s?: number }) {
 function Tree({ p, s = 1 }: { p: V3; s?: number }) {
   return (
     <group position={p} scale={s}>
-      <Box p={[0, 0.7, 0]} s={[0.3, 1.4, 0.3]} c="#7A5638" />
-      <Box p={[0, 1.8, 0]} s={[1.5, 1.2, 1.5]} c="#6E8F57" />
-      <Box p={[0.1, 2.6, -0.05]} s={[1, 0.8, 1]} c="#7FA164" />
+      <Box p={[0, 0.7, 0]} s={[0.3, 1.4, 0.3]} c="#8D6E52" />
+      <Box p={[0, 1.8, 0]} s={[1.5, 1.2, 1.5]} c="#3E9B4F" />
+      <Box p={[0.1, 2.6, -0.05]} s={[1, 0.8, 1]} c="#5DB86A" />
+    </group>
+  );
+}
+
+// Sepeda kampus warna-warni: rangka kotak dan dua roda, panjangnya searah sumbu z.
+function Bike({ p, c }: { p: V3; c: string }) {
+  return (
+    <group position={p}>
+      {[-0.42, 0.42].map((z) => (
+        <mesh key={z} position={[0, 0.3, z]} rotation={[0, Math.PI / 2, 0]}>
+          <torusGeometry args={[0.27, 0.04, 6, 16]} />
+          <meshStandardMaterial color="#202124" roughness={0.8} />
+        </mesh>
+      ))}
+      <Box p={[0, 0.5, 0]} s={[0.06, 0.06, 0.8]} c={c} shadow={false} />
+      <Box p={[0, 0.42, -0.18]} s={[0.06, 0.3, 0.06]} c={c} shadow={false} rotation={[0.35, 0, 0]} />
+      <Box p={[0, 0.7, -0.24]} s={[0.12, 0.05, 0.22]} c="#202124" shadow={false} />
+      <Box p={[0, 0.66, 0.36]} s={[0.4, 0.04, 0.05]} c="#5F6368" shadow={false} />
+      <Box p={[0, 0.58, 0.38]} s={[0.05, 0.16, 0.05]} c={c} shadow={false} />
+    </group>
+  );
+}
+
+// Meja kafe luar ruangan dengan payung berwarna.
+function CafeTable({ p, c }: { p: V3; c: string }) {
+  return (
+    <group position={p}>
+      <mesh position={[0, 0.72, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.55, 0.55, 0.06, 16]} />
+        <meshStandardMaterial color="#FFFFFF" roughness={0.6} />
+      </mesh>
+      <Box p={[0, 1.2, 0]} s={[0.06, 2.4, 0.06]} c="#BDC1C6" />
+      <mesh position={[0, 2.35, 0]} castShadow>
+        <coneGeometry args={[1.3, 0.55, 8]} />
+        <meshStandardMaterial color={c} roughness={0.7} />
+      </mesh>
+      {[0, Math.PI / 2, Math.PI, -Math.PI / 2].map((a) => (
+        <Box key={a} p={[Math.sin(a) * 0.85, 0.42, Math.cos(a) * 0.85]} s={[0.4, 0.06, 0.4]} c="#FFFFFF" />
+      ))}
+    </group>
+  );
+}
+
+// Kursi taman bersandaran miring, menghadap arah `ry`.
+function LawnChair({ p, c, ry = 0 }: { p: V3; c: string; ry?: number }) {
+  return (
+    <group position={p} rotation={[0, ry, 0]}>
+      <Box p={[0, 0.32, 0]} s={[0.7, 0.07, 0.7]} c={c} />
+      <Box p={[0, 0.7, -0.38]} s={[0.7, 0.75, 0.07]} c={c} rotation={[-0.35, 0, 0]} />
+      {[-0.38, 0.38].map((x) => (
+        <Box key={x} p={[x, 0.48, 0.05]} s={[0.08, 0.05, 0.8]} c={c} shadow={false} />
+      ))}
+    </group>
+  );
+}
+
+// Lapangan voli pasir di antara gedung dan deretan tempat ibadah.
+function Volleyball({ p }: { p: V3 }) {
+  return (
+    <group position={p}>
+      <Box p={[0, -0.03, 0]} s={[9, 0.08, 4.2]} c="#EAD9AE" shadow={false} />
+      {[
+        [0, -2.1, 9, 0.06],
+        [0, 2.1, 9, 0.06],
+        [-4.5, 0, 0.06, 4.2],
+        [4.5, 0, 0.06, 4.2]
+      ].map(([x, z, w, d]) => (
+        <Box key={`${x}${z}`} p={[x, 0.02, z]} s={[w, 0.01, d]} c="#FFFFFF" shadow={false} />
+      ))}
+      {[-2.3, 2.3].map((z) => (
+        <Box key={z} p={[0, 0.9, z]} s={[0.08, 1.8, 0.08]} c="#5F6368" />
+      ))}
+      <Box p={[0, 1.55, 0]} s={[0.03, 0.6, 4.6]} c="#F1F3F4" shadow={false} />
+      <mesh position={[1.6, 0.15, 0.8]} castShadow>
+        <sphereGeometry args={[0.15, 12, 8]} />
+        <meshStandardMaterial color={BRAND[2]} />
+      </mesh>
     </group>
   );
 }
@@ -478,6 +555,23 @@ export function Campus() {
       <Pool />
       <Library />
       <Park />
+      {/* rak sepeda di depan gedung: dua deretan, warna bergantian */}
+      {[...Array.from({ length: 9 }, (_, i) => -14.5 + i * 0.7), ...Array.from({ length: 9 }, (_, i) => 8 + i * 0.7)].map((x, i) => (
+        <Bike key={x} p={[x, 0, PROMENADE_Z + 1.7]} c={brandAt(i)} />
+      ))}
+      {/* kafe luar ruangan antara taman baca dan taman */}
+      {[
+        [11, 17],
+        [15.5, 17],
+        [11, 21.5],
+        [15.5, 21.5]
+      ].map(([x, z], i) => (
+        <CafeTable key={`${x}${z}`} p={[x, 0, z]} c={brandAt(i)} />
+      ))}
+      <Volleyball p={[0, 0, -9]} />
+      {[-14, -12.6, -11.2, 11.2, 12.6, 14].map((x, i) => (
+        <LawnChair key={x} p={[x, 0, -8.4]} c={brandAt(i)} ry={Math.PI} />
+      ))}
       {/* tugu di pojok tenggara kampus, menghadap arah kamera bawaan */}
       <Monument position={[38, 0, 25]} rotation={Math.PI / 4} />
       {LAMPS.map((p) => (

@@ -7,7 +7,7 @@ import { Campus } from "./Campus.tsx";
 import { Character } from "./Character.tsx";
 import { useHouse, useRooms } from "../../state/store.ts";
 import { CORRIDOR_HALF, FLOOR_HALF_X, FLOOR_HALF_Z, roomById } from "./layout.ts";
-import { MAT } from "./looks.ts";
+import { BRAND, brandAt, MAT } from "./looks.ts";
 import { Box } from "./parts.tsx";
 import { Room } from "./Room.tsx";
 import { StaticBatch } from "./StaticBatch.tsx";
@@ -88,12 +88,30 @@ function Commons({ onOpenProjects }: { onOpenProjects: () => void }) {
       </Html>
 
       <StaticBatch>
+        {/* alas gedung putih dengan tepi abu-abu, lalu lantai dan koridor */}
+        <Box p={[0, -0.09, 0]} s={[FLOOR_HALF_X * 2 + 0.6, 0.06, FLOOR_HALF_Z * 2 + 0.6]} c="#BDC1C6" shadow={false} />
         <Box p={[0, -0.05, 0]} s={[FLOOR_HALF_X * 2, 0.1, FLOOR_HALF_Z * 2]} c={MAT.concrete} shadow={false} />
         <Box p={[0, 0.005, 0]} s={[FLOOR_HALF_X * 2 - 1, 0.02, CORRIDOR_HALF * 2]} c={MAT.corridor} shadow={false} />
+        {/* garis empat warna di sepanjang koridor */}
+        {BRAND.map((c, i) => (
+          <Box key={c} p={[0, 0.018, -0.45 + i * 0.3]} s={[FLOOR_HALF_X * 2 - 3, 0.01, 0.12]} c={c} shadow={false} />
+        ))}
+        {/* tiang sudut gedung berwarna */}
+        {[
+          [-1, -1],
+          [1, -1],
+          [-1, 1],
+          [1, 1]
+        ].map(([sx, sz], i) => (
+          <Box key={`${sx}${sz}`} p={[sx * (FLOOR_HALF_X - 0.2), 0.9, sz * (FLOOR_HALF_Z - 0.2)]} s={[0.4, 1.8, 0.4]} c={brandAt(i)} />
+        ))}
         <group position={[-15.2, 0, 0.9]}>
-          <Box p={[0, 0.5, 0]} s={[0.7, 1.0, 2.2]} c={MAT.woodDark} />
+          <Box p={[0, 0.5, 0]} s={[0.7, 1.0, 2.2]} c="#FFFFFF" />
+          {BRAND.map((c, i) => (
+            <Box key={c} p={[0.36, 0.5, -0.825 + i * 0.55]} s={[0.02, 0.9, 0.55]} c={c} shadow={false} />
+          ))}
           <Box p={[0, 1.03, 0]} s={[0.8, 0.06, 2.3]} c={MAT.wood} />
-          <Box p={[-0.1, 1.2, -0.6]} s={[0.12, 0.28, 0.2]} c="#E2C27A" />
+          <Box p={[-0.1, 1.2, -0.6]} s={[0.12, 0.28, 0.2]} c={MAT.screenOff} />
         </group>
         <group position={[15.7, 0, -1.4]}>
           <Box p={[0, 0.45, 0]} s={[0.7, 0.9, 2.0]} c={MAT.wall} />
@@ -102,8 +120,8 @@ function Commons({ onOpenProjects }: { onOpenProjects: () => void }) {
           <Box p={[0, 1.0, 0.3]} s={[0.12, 0.12, 0.12]} c="#F4EEDF" />
         </group>
         <group position={[15.6, 0, 1.6]}>
-          <Box p={[0, 0.25, 0]} s={[0.8, 0.5, 2.0]} c="#7A5C46" />
-          <Box p={[0.3, 0.6, 0]} s={[0.2, 0.5, 2.0]} c="#6B4F3B" />
+          <Box p={[0, 0.25, 0]} s={[0.8, 0.5, 2.0]} c={BRAND[0]} />
+          <Box p={[0.3, 0.6, 0]} s={[0.2, 0.5, 2.0]} c="#3367D6" />
           <Box p={[-1.0, 0.22, 0]} s={[0.6, 0.06, 0.9]} c={MAT.wood} />
         </group>
       </StaticBatch>
@@ -212,8 +230,8 @@ export default function OfficeCanvas(props: OfficeProps) {
       <FrameDriver />
       <Atmosphere />
 
-      {rooms.map((r) => (
-        <Room key={r.id} room={r} selected={selectedId === r.id} onSelect={onSelect} onBoard={onOpenProjects} />
+      {rooms.map((r, i) => (
+        <Room key={r.id} room={r} tone={brandAt(i)} selected={selectedId === r.id} onSelect={onSelect} onBoard={onOpenProjects} />
       ))}
       {rooms.map((r) => (
         <Character key={r.id} id={r.id} reducedMotion={reducedMotion} onSelect={onSelect} />

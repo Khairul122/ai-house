@@ -27,8 +27,16 @@ const SCREEN: Record<AgentStatus, [string, number]> = {
   done: [MAT.done, 0.7]
 };
 
+// Warna aksen dicampur putih, untuk karpet yang tidak terlalu mencolok.
+function tint(hex: string, white: number) {
+  const n = Number.parseInt(hex.slice(1), 16);
+  const mix = (c: number) => Math.round(c + (255 - c) * white);
+  return `#${[(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => mix(c).toString(16).padStart(2, "0")).join("")}`;
+}
+
 // Dinding yang menghadap kamera turun rendah (gaya potongan rumah boneka) agar isi ruangan terlihat.
-function Wall({ p, s, n }: { p: V3; s: V3; n: [number, number] }) {
+// `accent`: panel warna di muka dalam dinding, ikut turun bersama dindingnya.
+function Wall({ p, s, n, accent }: { p: V3; s: V3; n: [number, number]; accent?: string }) {
   const ref = useRef<Mesh>(null);
   const dir = useMemo(() => new Vector3(), []);
   useFrame(({ camera }) => {
@@ -39,7 +47,27 @@ function Wall({ p, s, n }: { p: V3; s: V3; n: [number, number] }) {
     m.scale.y += ((facing ? 0.12 : 1) - m.scale.y) * 0.15;
     m.position.y = (s[1] * m.scale.y) / 2;
   });
-  return <Box ref={ref} p={p} s={s} c={MAT.wall} />;
+  return (
+    <Box ref={ref} p={p} s={s} c={MAT.wall}>
+      {accent && <Box p={[0, s[1] * 0.06, s[2] / 2 + 0.006]} s={[s[0] * 0.9, s[1] * 0.7, 0.012]} c={accent} shadow={false} />}
+    </Box>
+  );
+}
+
+// Bean bag bulat di pojok ruangan.
+function BeanBag({ p, c }: { p: V3; c: string }) {
+  return (
+    <group position={p}>
+      <mesh position={[0, 0.2, 0]} scale={[1, 0.62, 1]} castShadow receiveShadow>
+        <sphereGeometry args={[0.36, 14, 10]} />
+        <meshStandardMaterial color={c} roughness={0.9} />
+      </mesh>
+      <mesh position={[0, 0.36, -0.12]} scale={[0.9, 0.55, 0.6]}>
+        <sphereGeometry args={[0.3, 12, 8]} />
+        <meshStandardMaterial color={c} roughness={0.9} />
+      </mesh>
+    </group>
+  );
 }
 
 function Plant({ p }: { p: V3 }) {
@@ -179,9 +207,10 @@ interface RoomProps {
   selected: boolean;
   onSelect: (id: string) => void;
   onBoard: () => void;
+  tone: string; // warna aksen ruangan dari palet kampus
 }
 
-export function Room({ room, selected, onSelect, onBoard }: RoomProps) {
+export function Room({ room, selected, onSelect, onBoard, tone }: RoomProps) {
   const { status, agent } = useAgentStatus(room.id);
   const nameOf = useDivisionName();
   const [hover, setHover] = useState(false);
@@ -226,7 +255,7 @@ export function Room({ room, selected, onSelect, onBoard }: RoomProps) {
           glow={selected ? 0.22 : hover ? 0.12 : 0}
           shadow={false}
         />
-        <Wall p={[0, WALL_H / 2, -HD]} s={[ROOM_W + T, WALL_H, T]} n={[0, -flip]} />
+        <Wall p={[0, WALL_H / 2, -HD]} s={[ROOM_W + T, WALL_H, T]} n={[0, -flip]} accent={tone} />
         <Wall p={[-HW, WALL_H / 2, 0]} s={[T, WALL_H, ROOM_D]} n={[-flip, 0]} />
         <Wall p={[HW, WALL_H / 2, 0]} s={[T, WALL_H, ROOM_D]} n={[flip, 0]} />
         {[-1, 1].map((side) => (
@@ -253,8 +282,10 @@ export function Room({ room, selected, onSelect, onBoard }: RoomProps) {
             <Box key={`${x}${z}`} p={[x, 0.35, z]} s={[0.06, 0.7, 0.06]} c={MAT.woodDark} />
           ))}
           <Box p={[0, 0.2, -0.95]} s={[0.06, 0.4, 0.06]} c={MAT.metal} />
-          <Box p={[0, 0.42, -0.95]} s={[0.5, 0.07, 0.5]} c="#4A4E54" />
-          <Box p={[0, 0.72, -1.2]} s={[0.5, 0.55, 0.07]} c="#4A4E54" />
+          <Box p={[0, 0.42, -0.95]} s={[0.5, 0.07, 0.5]} c={tone} />
+          <Box p={[0, 0.72, -1.2]} s={[0.5, 0.55, 0.07]} c={tone} />
+          <Box p={[0, 0.05, -0.45]} s={[2.4, 0.02, 1.9]} c={tint(tone, 0.72)} shadow={false} />
+          <BeanBag p={[-HW + 0.55, 0, HD - 0.6]} c={tone} />
           <Plant p={[HW - 0.35, 0, -HD + 0.35]} />
           {fixed && <Signature id={room.id} status={status} onBoard={handleBoard} />}
         </StaticBatch>
@@ -263,7 +294,7 @@ export function Room({ room, selected, onSelect, onBoard }: RoomProps) {
         {!fixed && <Signature id={room.id} status={status} onBoard={handleBoard} />}
 
         <Html position={[0, WALL_H + 0.25, HD]} center zIndexRange={[10, 0]} pointerEvents="none">
-          <div className={`room-sign${selected ? " is-selected" : ""}`} style={{ borderColor: look.accent }}>
+          <div className={`room-sign${selected ? " is-selected" : ""}`} style={{ borderColor: tone }}>
             {look.short}
           </div>
           {/* kartu singkat saat kursor di atas ruangan: nama divisi, status, dan tugasnya */}

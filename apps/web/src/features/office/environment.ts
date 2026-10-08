@@ -38,11 +38,12 @@ export interface Lighting {
   fog: number; // 0 = tanpa kabut
 }
 
+// Langit biru jernih dan cahaya putih bersih, khas kampus teknologi di siang hari.
 const BASE: Record<Phase, Lighting> = {
-  pagi: { sky: "#F3E6D3", sunColor: "#FFE2B8", sun: 1.5, sunPos: [40, 30, 30], hemiSky: "#FFF1DE", hemiGround: "#B8A890", hemi: 1.05, lamps: false, fog: 0 },
-  siang: { sky: "#E9EEF0", sunColor: "#FFF8EC", sun: 1.9, sunPos: [20, 60, 15], hemiSky: "#FFF6E8", hemiGround: "#B8A890", hemi: 1.2, lamps: false, fog: 0 },
-  sore: { sky: "#F0D2B4", sunColor: "#FFB877", sun: 1.35, sunPos: [-40, 26, 20], hemiSky: "#FFE0C2", hemiGround: "#A89478", hemi: 0.95, lamps: false, fog: 0 },
-  malam: { sky: "#1C2230", sunColor: "#A9B8E0", sun: 0.35, sunPos: [-20, 40, -30], hemiSky: "#43507A", hemiGround: "#2A2620", hemi: 0.45, lamps: true, fog: 0 }
+  pagi: { sky: "#E4EEF8", sunColor: "#FFEBCC", sun: 1.45, sunPos: [40, 30, 30], hemiSky: "#EEF4FF", hemiGround: "#9FBF8A", hemi: 1.05, lamps: false, fog: 0 },
+  siang: { sky: "#D6E7FA", sunColor: "#FFFFFF", sun: 1.7, sunPos: [20, 60, 15], hemiSky: "#F2F7FF", hemiGround: "#9FBF8A", hemi: 1.15, lamps: false, fog: 0 },
+  sore: { sky: "#F3DCC6", sunColor: "#FFC48A", sun: 1.3, sunPos: [-40, 26, 20], hemiSky: "#FFE6CF", hemiGround: "#93AE7E", hemi: 0.95, lamps: false, fog: 0 },
+  malam: { sky: "#141B2D", sunColor: "#A9B8E0", sun: 0.35, sunPos: [-20, 40, -30], hemiSky: "#3D4C7A", hemiGround: "#22281F", hemi: 0.45, lamps: true, fog: 0 }
 };
 
 export function lightingFor(phase: Phase, weather: Weather): Lighting {
@@ -60,7 +61,7 @@ export function lightingFor(phase: Phase, weather: Weather): Lighting {
     l.sun *= 0.75;
     l.fog = 0.008;
   } else if (weather === "panas" && phase !== "malam") {
-    l.sky = "#F6E2BE";
+    l.sky = "#CFE4FB";
     l.sunColor = "#FFE6B0";
     l.sun *= 1.15;
   }
