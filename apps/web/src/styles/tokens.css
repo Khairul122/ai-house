@@ -181,3 +181,4 @@ a:focus-visible, button:focus-visible, .panel:focus-visible { outline: 2px solid
 .hud > .hud-card:first-child { flex-shrink: 0; white-space: nowrap; }
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-danger:hover:not(:disabled) { filter: brightness(1.08); }
+.speech-sleep { font-style: italic; color: #5E5A50; background: #F6F1E6; }

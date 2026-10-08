@@ -1,4 +1,7 @@
 import { BadGatewayException, BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Patch } from "@nestjs/common";
+import { desc, eq } from "drizzle-orm";
+import { db } from "../../../db/index.js";
+import { projects, tasks } from "../../../db/schema/index.js";
 import { FileDivisionRepository } from "../infrastructure/file-division.repository.js";
 
 export interface RouterModel {
@@ -46,6 +49,28 @@ export class DivisionsController {
   @Get("divisions/:id")
   get(@Param("id") id: string) {
     return this.divisionRepo.loadById(id);
+  }
+
+  // Pekerjaan divisi di semua proyek, terbaru dulu: apa yang dikerjakan dan hasilnya.
+  @Get("divisions/:id/tasks")
+  history(@Param("id") id: string) {
+    return db
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        description: tasks.description,
+        status: tasks.status,
+        attempt: tasks.attempt,
+        resultSummary: tasks.resultSummary,
+        updatedAt: tasks.updatedAt,
+        projectId: projects.id,
+        projectTitle: projects.title
+      })
+      .from(tasks)
+      .innerJoin(projects, eq(tasks.projectId, projects.id))
+      .where(eq(tasks.divisionId, id))
+      .orderBy(desc(tasks.updatedAt))
+      .limit(30);
   }
 
   @Get("models")

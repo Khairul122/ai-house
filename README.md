@@ -34,16 +34,36 @@ Sistem orkestrasi agen AI multi-divisi yang meniru struktur operasional perusaha
    pnpm --filter @ai-house/web dev
    ```
 
-## Menjalankan agen sungguhan
+## Pemakaian sehari-hari (produksi lokal)
 
-Tugas dijalankan oleh OpenCode lewat `opencode serve`. Server ini memakai kata sandi, jadi tetapkan sendiri agar tidak berganti setiap kali dinyalakan:
+```bash
+pnpm house:start
+```
 
-1. Isi `OPENCODE_SERVER_PASSWORD` di `.env` dengan kata sandi pilihan Anda.
-2. Jalankan OpenCode dengan kata sandi yang sama (PowerShell):
-   ```powershell
-   $env:OPENCODE_SERVER_PASSWORD = "kata-sandi-anda"; opencode serve --port 4096
-   ```
-3. Pastikan 9router aktif, dan model di `house/divisions/*.md` (mis. `9router/default-model`) terdaftar di konfigurasi OpenCode Anda.
+Skrip ini menyalakan 9router (bila belum jalan), OpenCode khusus House di port dari `OPENCODE_SERVER_URL` (bawaan 4097, terpisah dari OpenCode pribadi Anda di 4096), lalu API + dashboard di `http://127.0.0.1:3000`. Build dibuat otomatis saat pertama kali. Log ada di `data/logs/`.
+
+```bash
+pnpm house:stop
+```
+
+Menghentikan API dan OpenCode House. 9router dibiarkan karena dipakai alat lain (tambahkan `-All` di skrip untuk ikut mematikannya). Setelah mengubah kode, jalankan `pnpm build` lalu start ulang.
+
+Agar menyala otomatis saat login Windows, daftarkan sekali (jalankan sendiri di PowerShell):
+
+```powershell
+schtasks /Create /TN "AI House" /SC ONLOGON /TR "powershell -ExecutionPolicy Bypass -WindowStyle Hidden -File D:\portofolio\ai-house\scripts\start-house.ps1 -NoBrowser"
+```
+
+### Keamanan
+
+- Server hanya mendengar di `127.0.0.1`, jadi tidak bisa dibuka dari perangkat lain. Dari ponsel, pakai bot Telegram.
+- Permintaan yang mengubah data wajib membawa header `X-House`, sehingga situs lain yang Anda buka tidak bisa menyetujui aksi atas nama Anda.
+- Setiap workspace mendapat `opencode.json` yang membuat semua aksi agen bertanya dulu ke House. Agen tidak boleh mengubah berkas itu.
+- Halaman hasil kerja dibuka dalam sandbox, sehingga skrip buatan agen tidak bisa memanggil API House.
+
+### Model
+
+Pilih model atau kombo 9router per divisi di dashboard (panel Divisi). Pilihan disimpan ke `house/divisions/<id>.md`.
 
 Untuk mencoba alur tanpa model, set `AGENT_RUNTIME=fake`. PM membuat rencana tiruan, dan divisi Dev meminta izin `npm install express` supaya alur persetujuan bisa dicoba.
 

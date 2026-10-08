@@ -5,25 +5,51 @@ import type { Group } from "three";
 import type { AgentStatus, Dispatch } from "../../state/reduce.ts";
 import { office } from "../../state/store.ts";
 import { useAgentStatus } from "../../state/useAgentStatus.ts";
-import { deskOf, insideOf, randomInRoom, ROOMS, roomById, seatOf, SPOTS, standOf, toCorridor, type Vec2 } from "./layout.ts";
+import {
+  type Act,
+  deskOf,
+  insideOf,
+  LEISURE,
+  POOL,
+  randomInRoom,
+  roomById,
+  seatOf,
+  SMALL_TALK,
+  standOf,
+  toCorridor,
+  type Vec2
+} from "./layout.ts";
 import { type Accessory, lookOf, MAT } from "./looks.ts";
 import { Box } from "./parts.tsx";
-import { buildPath, zoneAt, type Zone } from "./walk.ts";
+import { claim, leaveMeet, markArrived, meetOf, placeIn, proposeChat, releaseAll, setAvailable, turnOf } from "./social.ts";
+import { buildPath, type Zone, zoneAt } from "./walk.ts";
 
 const SPEED = 1.8;
 const PANTS = "#3A3A40";
 const SHOE = "#2A2522";
 
+type Pose = "sit" | "stand" | "lie" | "swim";
+
 interface Goal {
   key: string;
   zone: Zone;
   at: Vec2;
-  pose: "sit" | "stand";
+  pose: Pose;
   face?: number;
+  act?: Act | "chat";
 }
 
 const angleTo = (from: Vec2, to: Vec2) => Math.atan2(to[0] - from[0], to[1] - from[1]);
-const jitter = (p: Vec2, r = 0.35): Vec2 => [p[0] + (Math.random() - 0.5) * r * 2, p[1] + (Math.random() - 0.5) * r * 2];
+const inPool = (x: number, z: number) => Math.abs(x - POOL.x) < POOL.w / 2 && Math.abs(z - POOL.z) < POOL.d / 2;
+const shuffle = <T,>(list: T[]) => [...list].sort(() => Math.random() - 0.5);
+
+function lineFor(id: string, turn: number) {
+  const own = SMALL_TALK[id] ?? [];
+  const pool = turn % 3 === 2 ? SMALL_TALK.umum : own.length ? own : SMALL_TALK.umum;
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 997;
+  return pool[(turn * 7 + h) % pool.length];
+}
 
 function HeadGear({ kind, accent, hair, shirt }: { kind: Accessory; accent: string; hair: string; shirt: string }) {
   switch (kind) {
@@ -81,6 +107,7 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
   const { agent, status } = useAgentStatus(id);
 
   const root = useRef<Group>(null);
+  const tilt = useRef<Group>(null);
   const body = useRef<Group>(null);
   const head = useRef<Group>(null);
   const armL = useRef<Group>(null);
@@ -88,7 +115,11 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
   const legL = useRef<Group>(null);
   const legR = useRef<Group>(null);
   const folder = useRef<Group>(null);
+  const book = useRef<Group>(null);
+  const cup = useRef<Group>(null);
   const bang = useRef<Group>(null);
+  const talk = useRef<HTMLDivElement>(null);
+  const talkAnchor = useRef<Group>(null);
 
   const seat = seatOf(room);
   const faceDesk = angleTo(seat, deskOf(room));
@@ -100,9 +131,10 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       path: [] as Vec2[],
       goal: { key: "start", zone: id, at: seat, pose: "sit", face: faceDesk } as Goal,
       idle: null as Goal | null,
-      nextIdle: Date.now() + Math.random() * 5000,
-      idleCount: 0,
+      nextIdle: Date.now() + Math.random() * 6000,
+      count: 0,
       lastStatus: "idle" as AgentStatus,
+      chatting: false,
       carrying: null as Dispatch | null,
       handoverAt: 0
     }),
@@ -112,16 +144,20 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
 
   const sitGoal = (key: string): Goal => ({ key, zone: id, at: seat, pose: "sit", face: faceDesk });
 
-  const pickIdle = (): Goal => {
-    const n = `idle-${brain.idleCount++}`;
+  // Memilih kegiatan santai berikutnya: kursi kerja, jalan-jalan, ngobrol, atau tempat santai.
+  const pickIdle = (now: number): Goal => {
+    releaseAll(id);
+    const n = `idle-${brain.count++}`;
     if (reducedMotion) return sitGoal(n);
     const r = Math.random();
-    if (r < 0.35) return sitGoal(n);
-    if (r < 0.6) return { key: n, zone: id, at: randomInRoom(room), pose: "stand" };
-    if (r < 0.75) return { key: n, zone: "hall", at: jitter(SPOTS.pantry), pose: "stand", face: Math.PI / 2 };
-    if (r < 0.87) return { key: n, zone: "hall", at: jitter(SPOTS.sofa), pose: "stand", face: Math.PI / 2 };
-    const other = ROOMS[Math.floor(Math.random() * ROOMS.length)];
-    return { key: n, zone: other.id, at: jitter(insideOf(other), 0.25), pose: "stand" };
+    if (r < 0.16) return sitGoal(n);
+    if (r < 0.26) return { key: n, zone: id, at: randomInRoom(room), pose: "stand" };
+    if (r < 0.42 && proposeChat(id, [brain.x, brain.z], now)) return brain.goal; // obrolan diambil alih oleh meetOf
+    for (const spot of shuffle(LEISURE)) {
+      if (!claim(spot.key, id)) continue;
+      return { key: `${n}-${spot.key}`, zone: zoneAt(spot.at[0], spot.at[1]), at: spot.at, pose: spot.pose, face: spot.face, act: spot.act };
+    }
+    return { key: n, zone: id, at: randomInRoom(room), pose: "stand" };
   };
 
   useFrame(({ clock }, delta) => {
@@ -136,16 +172,24 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       if (status === "idle") {
         brain.idle = null;
         brain.nextIdle = now + 2000;
+      } else {
+        leaveMeet(id);
+        releaseAll(id);
       }
       brain.lastStatus = status;
     }
+    const busyLeisure = brain.goal.act === "sleep" || brain.goal.act === "swim";
+    setAvailable(id, status === "idle" && !reducedMotion && !brain.carrying && !busyLeisure && brain.path.length === 0);
 
     // 1. Pilih tujuan dari status asli backend.
     let goal: Goal;
     if (id === "pm" && status !== "waiting" && !brain.carrying && s.dispatches.length > 0) {
       brain.carrying = s.dispatches[0];
       brain.handoverAt = 0;
+      leaveMeet(id);
+      releaseAll(id);
     }
+    const meet = status === "idle" && !brain.carrying ? meetOf(id, now) : undefined;
     if (brain.carrying) {
       const target = roomById(brain.carrying.to);
       goal = target
@@ -155,18 +199,25 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     else if (status === "failed") goal = sitGoal("fail");
     else if (status === "waiting") {
       goal = { key: "wait", zone: id, at: standOf(room), pose: "stand", face: toCorridor(room) > 0 ? 0 : Math.PI };
-    } else if (status === "done") goal = { ...brain.goal, pose: "stand" };
-    else {
+    } else if (status === "done") goal = { ...brain.goal, pose: brain.goal.pose === "sit" ? "sit" : "stand", act: undefined };
+    else if (meet) {
+      const place = placeIn(meet, id);
+      goal = { key: meet.key, zone: meet.zone, at: place.at, pose: "stand", face: place.face, act: "chat" };
+      brain.chatting = true;
+    } else {
+      if (brain.chatting) {
+        brain.chatting = false;
+        brain.nextIdle = 0; // obrolan selesai: cari kegiatan baru
+      }
       if (!brain.idle || now > brain.nextIdle) {
-        brain.idle = pickIdle();
-        brain.nextIdle = now + 8000 + Math.random() * 9000;
+        brain.idle = pickIdle(now);
+        const long = brain.idle.act === "sleep" || brain.idle.act === "read";
+        brain.nextIdle = now + (long ? 18000 : 9000) + Math.random() * 9000;
       }
       goal = brain.idle;
     }
 
-    if (goal.key !== brain.goal.key) {
-      brain.path = buildPath(zoneAt(brain.x, brain.z), goal.zone, goal.at);
-    }
+    if (goal.key !== brain.goal.key) brain.path = buildPath(zoneAt(brain.x, brain.z), goal.zone, goal.at, [brain.x, brain.z]);
     brain.goal = goal;
 
     // 2. Berjalan menyusuri titik rute.
@@ -176,7 +227,7 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       const dx = tx - brain.x;
       const dz = tz - brain.z;
       const dist = Math.hypot(dx, dz);
-      const step = SPEED * dt;
+      const step = SPEED * (inPool(brain.x, brain.z) ? 0.5 : 1) * dt;
       if (dist <= step) {
         brain.x = tx;
         brain.z = tz;
@@ -189,6 +240,7 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     } else if (goal.face !== undefined) {
       brain.facing = goal.face;
     }
+    if (meet && !moving) markArrived(meet, id, now);
 
     // Serah-terima map tugas oleh PM.
     if (brain.carrying && !moving && goal.key.startsWith("deliver")) {
@@ -200,6 +252,9 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     }
 
     // 3. Pose tubuh.
+    const swimming = inPool(brain.x, brain.z);
+    const pose: Pose = swimming ? "swim" : moving ? "stand" : goal.pose;
+    const act = moving ? undefined : goal.act;
     let lx = 0;
     let rx = 0;
     let al = 0;
@@ -207,16 +262,34 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     let alz = 0;
     let arz = 0;
     let hx = 0;
+    let hy = 0;
     let bx = 0;
     let y = 0;
-    if (moving) {
+    let tiltX = 0;
+    let lift = 0;
+
+    if (pose === "swim") {
+      tiltX = Math.PI / 2;
+      lift = 0.12;
+      lx = Math.sin(t * 10) * 0.35;
+      rx = -lx;
+      hx = -0.9; // kepala menengadah di atas air
+    } else if (pose === "lie") {
+      tiltX = -Math.PI / 2;
+      lift = 0.48;
+      hx = act === "sleep" ? 0 : -0.25;
+      al = ar = act === "relax" ? -2.6 : 0; // santai: tangan di belakang kepala
+      alz = act === "relax" ? 0.6 : 0;
+      arz = act === "relax" ? -0.6 : 0;
+      bx = act === "sleep" ? Math.sin(t * 1.2) * 0.02 : 0; // napas pelan
+    } else if (moving) {
       const w = Math.sin(t * 9);
       lx = w * 0.6;
       rx = -w * 0.6;
       al = -w * 0.5;
       ar = w * 0.5;
       y = Math.abs(Math.cos(t * 9)) * 0.05;
-    } else if (goal.pose === "sit") {
+    } else if (pose === "sit") {
       lx = rx = -Math.PI / 2;
       if (status === "working") {
         al = -1.25 + Math.sin(t * 16) * 0.08;
@@ -226,6 +299,9 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
         al = ar = -0.2;
         hx = 0.5;
         bx = 0.25;
+      } else if (act === "read") {
+        al = ar = -1.0;
+        hx = 0.35;
       } else {
         al = ar = -0.15;
       }
@@ -237,21 +313,53 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       alz = 0.25;
       arz = -0.25;
       y = Math.abs(Math.sin(t * 7)) * 0.12;
+    } else if (act === "chat" && meet) {
+      const turn = turnOf(meet, now);
+      if (turn?.speaker === id) {
+        al = -0.5 + Math.sin(t * 5) * 0.35; // bicara sambil bergerak tangan
+        ar = -0.4 + Math.sin(t * 4 + 1) * 0.3;
+        hy = Math.sin(t * 2) * 0.1;
+      } else if (turn) {
+        hx = Math.max(0, Math.sin(t * 3)) * 0.15; // mengangguk mendengarkan
+      }
+    } else if (act === "coffee") {
+      const sip = Math.sin(t * 0.8 + id.length) > 0.85;
+      ar = sip ? -2.2 : -0.7;
+      hx = sip ? -0.2 : 0;
+    } else if (act === "stretch") {
+      const k = (Math.sin(t * 1.6) + 1) / 2;
+      al = ar = -0.3 - k * 2.7;
+      alz = 0.3 * k;
+      arz = -0.3 * k;
+      y = k * 0.05;
+    } else if (act === "read") {
+      al = ar = -1.0;
+      hx = 0.3;
     }
     if (brain.carrying && status !== "waiting") ar = moving ? -0.6 : -1.0;
 
-    const k = Math.min(1, dt * 12);
-    const ease = (obj: Group | null, axis: "x" | "z", v: number) => {
+    const k = Math.min(1, dt * 10);
+    const ease = (obj: Group | null, axis: "x" | "y" | "z", v: number) => {
       if (obj) obj.rotation[axis] += (v - obj.rotation[axis]) * k;
     };
     ease(legL.current, "x", lx);
     ease(legR.current, "x", rx);
-    ease(armL.current, "x", al);
-    ease(armR.current, "x", ar);
-    ease(armL.current, "z", alz);
-    ease(armR.current, "z", arz);
     ease(head.current, "x", hx);
+    ease(head.current, "y", hy);
     ease(body.current, "x", bx);
+    ease(tilt.current, "x", tiltX);
+    if (pose === "swim" && armL.current && armR.current) {
+      // gaya bebas: lengan berputar penuh, bukan ditarik ke satu sudut
+      armL.current.rotation.x = -((t * 4) % (Math.PI * 2));
+      armR.current.rotation.x = -((t * 4 + Math.PI) % (Math.PI * 2));
+      armL.current.rotation.z = armR.current.rotation.z = 0;
+    } else {
+      ease(armL.current, "x", al);
+      ease(armR.current, "x", ar);
+      ease(armL.current, "z", alz);
+      ease(armR.current, "z", arz);
+    }
+    if (tilt.current) tilt.current.position.y += (lift - tilt.current.position.y) * k;
 
     g.position.set(brain.x, y, brain.z);
     let diff = brain.facing - g.rotation.y;
@@ -259,10 +367,27 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     g.rotation.y += diff * Math.min(1, dt * 10);
 
     if (folder.current) folder.current.visible = !!brain.carrying;
+    if (book.current) book.current.visible = act === "read" && !brain.carrying;
+    if (cup.current) cup.current.visible = act === "coffee" && !brain.carrying;
     if (bang.current && agent) {
       const fresh = now - agent.changedAt < 3000; // memantul sebentar saat baru muncul, lalu diam
       bang.current.position.y = 1.78 + (fresh && !reducedMotion ? Math.abs(Math.sin(now / 140)) * 0.12 : 0);
     }
+
+    // Gelembung obrolan / tidur, diubah langsung tanpa render ulang React.
+    const el = talk.current;
+    if (el) {
+      let text = "";
+      if (act === "chat" && meet) {
+        const turn = turnOf(meet, now);
+        if (turn?.speaker === id) text = lineFor(id, turn.turn);
+      } else if (act === "sleep" && pose === "lie") text = "Zzz";
+      if (el.textContent !== text) el.textContent = text;
+      el.style.display = text ? "" : "none";
+      el.className = text === "Zzz" ? "speech speech-sleep" : "speech";
+    }
+    // berbaring: kepala ada di belakang kaki, jadi gelembung ikut pindah
+    talkAnchor.current?.position.set(0, pose === "lie" ? 0.95 : 1.75, pose === "lie" ? -1.15 : 0);
   });
 
   return (
@@ -273,41 +398,51 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
         onSelect(id);
       }}
     >
-      {[legL, legR].map((ref, i) => (
-        <group key={i} ref={ref} position={[i ? 0.11 : -0.11, 0.45, 0]}>
-          <Box p={[0, -0.21, 0]} s={[0.17, 0.42, 0.19]} c={PANTS} />
-          <Box p={[0, -0.41, 0.04]} s={[0.18, 0.07, 0.25]} c={SHOE} />
-        </group>
-      ))}
-
-      <group ref={body} position={[0, 0.45, 0]}>
-        <Box p={[0, 0.25, 0]} s={[0.46, 0.5, 0.28]} c={look.shirt} />
-        {look.accessory === "tie" && <Box p={[0, 0.3, 0.145]} s={[0.08, 0.32, 0.02]} c={look.accent} shadow={false} />}
-        {look.accessory === "scarf" && <Box p={[0, 0.48, 0]} s={[0.5, 0.1, 0.32]} c={look.accent} />}
-
-        {[armL, armR].map((ref, i) => (
-          <group key={i} ref={ref} position={[i ? 0.3 : -0.3, 0.47, 0]}>
-            <Box p={[0, -0.19, 0]} s={[0.13, 0.4, 0.13]} c={look.shirt} />
-            <Box p={[0, -0.43, 0]} s={[0.11, 0.1, 0.11]} c={look.skin} />
-            {i === 1 && (
-              <group ref={folder} visible={false}>
-                <Box p={[0, -0.5, 0.12]} s={[0.05, 0.3, 0.26]} c="#E2C27A" />
-              </group>
-            )}
+      <group ref={tilt}>
+        {[legL, legR].map((ref, i) => (
+          <group key={i} ref={ref} position={[i ? 0.11 : -0.11, 0.45, 0]}>
+            <Box p={[0, -0.21, 0]} s={[0.17, 0.42, 0.19]} c={PANTS} />
+            <Box p={[0, -0.41, 0.04]} s={[0.18, 0.07, 0.25]} c={SHOE} />
           </group>
         ))}
 
-        <group ref={head} position={[0, 0.5, 0]}>
-          <Box p={[0, 0.19, 0]} s={[0.38, 0.38, 0.38]} c={look.skin} />
-          <Box p={[-0.08, 0.21, 0.195]} s={[0.05, 0.06, 0.02]} c="#1B1A17" shadow={false} />
-          <Box p={[0.08, 0.21, 0.195]} s={[0.05, 0.06, 0.02]} c="#1B1A17" shadow={false} />
-          {look.accessory !== "hood" && (
-            <>
-              <Box p={[0, 0.37, -0.01]} s={[0.4, 0.08, 0.41]} c={look.hair} />
-              <Box p={[0, 0.22, -0.18]} s={[0.4, 0.3, 0.06]} c={look.hair} />
-            </>
-          )}
-          <HeadGear kind={look.accessory} accent={look.accent} hair={look.hair} shirt={look.shirt} />
+        <group ref={body} position={[0, 0.45, 0]}>
+          <Box p={[0, 0.25, 0]} s={[0.46, 0.5, 0.28]} c={look.shirt} />
+          {look.accessory === "tie" && <Box p={[0, 0.3, 0.145]} s={[0.08, 0.32, 0.02]} c={look.accent} shadow={false} />}
+          {look.accessory === "scarf" && <Box p={[0, 0.48, 0]} s={[0.5, 0.1, 0.32]} c={look.accent} />}
+
+          {[armL, armR].map((ref, i) => (
+            <group key={i} ref={ref} position={[i ? 0.3 : -0.3, 0.47, 0]}>
+              <Box p={[0, -0.19, 0]} s={[0.13, 0.4, 0.13]} c={look.shirt} />
+              <Box p={[0, -0.43, 0]} s={[0.11, 0.1, 0.11]} c={look.skin} />
+              {i === 1 && (
+                <>
+                  <group ref={folder} visible={false}>
+                    <Box p={[0, -0.5, 0.12]} s={[0.05, 0.3, 0.26]} c="#E2C27A" />
+                  </group>
+                  <group ref={cup} visible={false}>
+                    <Box p={[0, -0.5, 0.08]} s={[0.1, 0.13, 0.1]} c="#F4EEDF" />
+                  </group>
+                  <group ref={book} visible={false}>
+                    <Box p={[-0.3, -0.5, 0.06]} s={[0.42, 0.06, 0.3]} c={look.accent} rotation={[0.5, 0, 0]} />
+                  </group>
+                </>
+              )}
+            </group>
+          ))}
+
+          <group ref={head} position={[0, 0.5, 0]}>
+            <Box p={[0, 0.19, 0]} s={[0.38, 0.38, 0.38]} c={look.skin} />
+            <Box p={[-0.08, 0.21, 0.195]} s={[0.05, 0.06, 0.02]} c="#1B1A17" shadow={false} />
+            <Box p={[0.08, 0.21, 0.195]} s={[0.05, 0.06, 0.02]} c="#1B1A17" shadow={false} />
+            {look.accessory !== "hood" && (
+              <>
+                <Box p={[0, 0.37, -0.01]} s={[0.4, 0.08, 0.41]} c={look.hair} />
+                <Box p={[0, 0.22, -0.18]} s={[0.4, 0.3, 0.06]} c={look.hair} />
+              </>
+            )}
+            <HeadGear kind={look.accessory} accent={look.accent} hair={look.hair} shirt={look.shirt} />
+          </group>
         </group>
       </group>
 
@@ -322,6 +457,14 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
         <Html position={[0, 1.85, 0]} center zIndexRange={[10, 0]} pointerEvents="none">
           <div className="speech">{agent.task.title}</div>
         </Html>
+      )}
+
+      {status === "idle" && (
+        <group ref={talkAnchor} position={[0, 1.75, 0]}>
+          <Html center zIndexRange={[10, 0]} pointerEvents="none">
+            <div ref={talk} className="speech" style={{ display: "none" }} />
+          </Html>
+        </group>
       )}
     </group>
   );

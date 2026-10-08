@@ -1,11 +1,13 @@
 import { Link, useParams } from "react-router-dom";
-import { PanelShell } from "../components/PanelShell.tsx";
+import { ErrorNote, PanelShell } from "../components/PanelShell.tsx";
+import { timeAgo, useFetch } from "../lib/hooks.ts";
 import { lookOf } from "../features/office/looks.ts";
 import type { AgentState, AgentStatus } from "../state/reduce.ts";
-import { useDivisions } from "../state/store.ts";
+import { useDivisions, useOffice } from "../state/store.ts";
 import { useAgentStatus } from "../state/useAgentStatus.ts";
 import { ApprovalCard } from "./ApprovalCard.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
+import { TASK_STATUS } from "./ProjectPanel.tsx";
 
 export const STATUS_LABEL: Record<AgentStatus, string> = {
   idle: "Santai",
@@ -70,6 +72,79 @@ function Rules({ label, items, tone }: { label: string; items: string[]; tone: s
   );
 }
 
+interface WorkItem {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  attempt: number;
+  resultSummary: string | null;
+  updatedAt: string;
+  projectId: string;
+  projectTitle: string;
+}
+
+function WorkRow({ w }: { w: WorkItem }) {
+  const [label, tone] = TASK_STATUS[w.status] ?? [w.status, ""];
+  const summary = w.resultSummary?.trim();
+  return (
+    <li className={`py-3 ${w.status === "running" ? "bg-accent/5 -mx-2 px-2 rounded" : ""}`}>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-ink min-w-0">{w.title}</p>
+        <span className={`tag ${tone} shrink-0`}>{label}</span>
+      </div>
+      <p className="text-xs text-ink-muted mt-0.5">
+        <Link to={`/projects/${w.projectId}`} className="underline underline-offset-2 hover:text-ink">
+          {w.projectTitle}
+        </Link>
+        {" · "}
+        {timeAgo(w.updatedAt)}
+        {w.attempt > 1 && ` · percobaan ke-${w.attempt}`}
+      </p>
+      {w.status === "running" && <p className="text-sm text-ink-muted mt-1.5">{w.description}</p>}
+      {summary &&
+        (summary.length > 220 ? (
+          <details className="mt-1.5">
+            <summary className="text-sm text-ink cursor-pointer">{summary.slice(0, 140).split("\n")[0]}…</summary>
+            <p className="text-sm text-ink whitespace-pre-wrap mt-1">{summary}</p>
+          </details>
+        ) : (
+          <p className={`text-sm mt-1.5 whitespace-pre-wrap ${w.status === "failed" ? "text-danger" : "text-ink"}`}>{summary}</p>
+        ))}
+      {w.status === "done" && (
+        <Link to={`/projects/${w.projectId}`} className="text-xs text-accent underline underline-offset-2 mt-1.5 inline-block">
+          Lihat berkas hasil
+        </Link>
+      )}
+    </li>
+  );
+}
+
+// Apa yang sedang dan pernah dikerjakan divisi ini, beserta hasilnya.
+function DivisionWork({ id }: { id: string }) {
+  const version = useOffice((s) => s.version);
+  const { data, error } = useFetch<WorkItem[]>(`/api/divisions/${id}/tasks`, version);
+  if (error) return <ErrorNote>{error}</ErrorNote>;
+  if (!data) return <p className="text-sm text-ink-muted">Memuat pekerjaan…</p>;
+  if (!data.length) {
+    return <p className="text-sm text-ink-muted">Belum ada tugas. Tugas muncul di sini setelah PM membagi rencana proyek ke divisi ini.</p>;
+  }
+  const done = data.filter((w) => w.status === "done").length;
+  return (
+    <section>
+      <h3 className="text-sm font-semibold text-ink mb-1">Pekerjaan</h3>
+      <p className="text-xs text-ink-muted mb-1">
+        {data.length} tugas terakhir, {done} selesai.
+      </p>
+      <ol className="divide-y divide-line border-y border-line">
+        {data.map((w) => (
+          <WorkRow key={w.id} w={w} />
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 export function DivisionPanel() {
   const { id = "" } = useParams();
   const division = useDivisions().find((d) => d.id === id);
@@ -85,18 +160,21 @@ export function DivisionPanel() {
         </div>
       )}
 
+      <DivisionWork id={id} />
+
       {division ? (
-        <>
-          <p className="text-sm text-ink-muted mb-4">{division.description}</p>
-          <dl className="space-y-3 border-t border-line pt-4">
+        <details className="mt-5 border-t border-line pt-3">
+          <summary className="text-sm font-semibold text-ink cursor-pointer">Pengaturan divisi</summary>
+          <p className="text-sm text-ink-muted my-3">{division.description}</p>
+          <dl className="space-y-3">
             <ModelPicker key={division.id} divisionId={division.id} current={division.model} />
             <Rules label="Boleh tanpa izin" items={division.permission.bash.allow} tone="text-ok" />
             <Rules label="Harus minta izin" items={division.permission.bash.ask} tone="text-warn" />
             <Rules label="Selalu ditolak" items={division.permission.bash.deny} tone="text-danger" />
           </dl>
-        </>
+        </details>
       ) : (
-        <p className="text-sm text-ink-muted">Data divisi belum termuat dari server.</p>
+        <p className="text-sm text-ink-muted mt-4">Data divisi belum termuat dari server.</p>
       )}
     </PanelShell>
   );

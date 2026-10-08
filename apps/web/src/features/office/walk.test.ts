@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { insideOf, laneOf, roomById, SPOTS } from "./layout.ts";
+import { EXITS, FLOOR_HALF_X, FLOOR_HALF_Z, insideOf, LEISURE, laneOf, PROMENADE_Z, roomById, SPOTS } from "./layout.ts";
 import { buildPath, zoneAt } from "./walk.ts";
+
+// Titik di dalam jejak gedung tetapi bukan koridor/pintu: rute luar tidak boleh menembusnya.
+const insideBuilding = ([x, z]: [number, number]) => Math.abs(x) < FLOOR_HALF_X - 0.5 && Math.abs(z) > 1.5 && Math.abs(z) < FLOOR_HALF_Z;
 
 describe("buildPath", () => {
   it("di ruangan yang sama langsung ke tujuan", () => {
@@ -18,11 +21,24 @@ describe("buildPath", () => {
     expect(zoneAt(pm.x, pm.z)).toBe("pm");
     expect(zoneAt(pm.x, 0)).toBe("hall");
     expect(zoneAt(SPOTS.pantry[0], SPOTS.pantry[1])).toBe("hall");
+    expect(zoneAt(-20, 14)).toBe("outside");
+    expect(zoneAt(0, 12)).toBe("outside");
   });
 
-  it("ke pantry berakhir di titik pantry", () => {
-    const path = buildPath("devops", "hall", SPOTS.pantry);
-    expect(path.at(-1)).toEqual(SPOTS.pantry);
-    expect(path.at(-2)).toEqual([13, 0]);
+  it("ke kolam renang keluar lewat pintu barat dan jalan setapak", () => {
+    const pool = LEISURE.find((l) => l.key === "kursi-kolam-0")!.at;
+    const path = buildPath("devops", "outside", pool);
+    expect(path).toContainEqual(EXITS.west.inner);
+    expect(path).toContainEqual([EXITS.west.outer[0], PROMENADE_Z]);
+    expect(path.at(-1)).toEqual(pool);
+    expect(path.filter(insideBuilding).every((p) => zoneAt(p[0], p[1]) !== "outside")).toBe(true);
+  });
+
+  it("pulang dari taman ke kursi kerja masuk lewat pintu timur", () => {
+    const pm = roomById("pm")!;
+    const path = buildPath("outside", "pm", [pm.x, pm.z], [25, 22]);
+    expect(path[0]).toEqual([25, PROMENADE_Z]);
+    expect(path).toContainEqual(EXITS.east.inner);
+    expect(path.at(-1)).toEqual([pm.x, pm.z]);
   });
 });

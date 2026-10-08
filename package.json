@@ -6,7 +6,9 @@
     "build": "pnpm --filter @ai-house/shared build && pnpm --filter @ai-house/* build",
     "test": "vitest run",
     "lint": "biome check .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "house:start": "powershell -ExecutionPolicy Bypass -File scripts/start-house.ps1",
+    "house:stop": "powershell -ExecutionPolicy Bypass -File scripts/stop-house.ps1"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",

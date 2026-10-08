@@ -22,7 +22,7 @@ interface Detail {
   tasks: Task[];
 }
 
-const TASK_STATUS: Record<string, [string, string]> = {
+export const TASK_STATUS: Record<string, [string, string]> = {
   queued: ["Antre", ""],
   running: ["Berjalan", "tag-working"],
   done: ["Selesai", "tag-done"],
