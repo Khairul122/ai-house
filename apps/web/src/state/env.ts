@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { type Phase, PHASE_START, phaseOf, type Weather, weatherFrom } from "../features/office/environment.ts";
+import { whenHouse } from "./store.ts";
 
 // Suasana kantor: jam (nyata atau simulasi), cuaca (nyata dari Open-Meteo atau pilihan), dan suara.
 export interface EnvState {
@@ -68,10 +69,17 @@ export function useEnv<T>(select: (s: EnvState) => T): T {
   return useSyncExternalStore(env.subscribe, () => select(state));
 }
 
-// Cuaca nyata Bandung dari Open-Meteo (gratis, tanpa kunci). Diperbarui tiap 15 menit.
+// Cuaca nyata di lokasi kantor (profil dari server) lewat Open-Meteo (gratis, tanpa kunci). Diperbarui tiap 15 menit.
 async function fetchWeather() {
   try {
-    const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=-6.917&longitude=107.619&current=temperature_2m,weather_code&timezone=Asia%2FJakarta");
+    const house = await whenHouse();
+    const q = new URLSearchParams({
+      latitude: String(house.latitude),
+      longitude: String(house.longitude),
+      current: "temperature_2m,weather_code",
+      timezone: house.timezone
+    });
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`);
     const body = (await res.json()) as { current?: { temperature_2m: number; weather_code: number } };
     if (body.current) set({ autoWeather: weatherFrom(body.current.weather_code, body.current.temperature_2m), tempC: Math.round(body.current.temperature_2m) });
   } catch {

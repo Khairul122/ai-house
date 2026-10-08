@@ -12,20 +12,41 @@ export interface RoomDef {
   id: string;
   x: number;
   z: number; // pusat ruangan
+  w: number; // lebar ruangan, menyempit bila divisi lebih dari kapasitas gedung
   side: Side;
 }
 
-const XS = [-10, -5, 0, 5, 10];
-const NORTH = ["content-creator", "ui-ux-design", "pm", "software-development", "research-content"];
-const SOUTH = ["data-analyst", "qa-testing", "devops", "infrastructure-network", "cybersecurity"];
+// Lebar total deretan ruangan di dalam gedung (antara meja resepsionis dan pantry).
+const ROW_SPAN = 25;
 const ROW_Z = CORRIDOR_HALF + ROOM_D / 2;
 
-export const ROOMS: RoomDef[] = [
-  ...NORTH.map((id, i) => ({ id, x: XS[i], z: -ROW_Z, side: "n" as const })),
-  ...SOUTH.map((id, i) => ({ id, x: XS[i], z: ROW_Z, side: "s" as const }))
-];
+// Denah dihitung dari daftar divisi: separuh pertama di deretan utara, sisanya di selatan,
+// kolom keduanya sejajar dan berpusat di tengah koridor.
+export function buildRooms(ids: string[]): RoomDef[] {
+  const cols = Math.max(1, Math.ceil(ids.length / 2));
+  const spacing = Math.min(5, ROW_SPAN / cols);
+  const w = Math.min(ROOM_W, spacing - 0.6);
+  const xAt = (i: number) => (i - (cols - 1) / 2) * spacing;
+  return ids.map((id, i) => {
+    const north = i < cols;
+    const col = north ? i : i - cols;
+    return { id, x: xAt(col), z: north ? -ROW_Z : ROW_Z, w, side: north ? "n" : "s" };
+  });
+}
 
-export const roomById = (id: string) => ROOMS.find((r) => r.id === id);
+let rooms: RoomDef[] = [];
+let roomKey = "";
+
+// Dipanggil setiap daftar divisi dimuat ulang dari server.
+export function setRoomOrder(ids: string[]) {
+  const key = ids.join("|");
+  if (key === roomKey) return;
+  roomKey = key;
+  rooms = buildRooms(ids);
+}
+
+export const getRooms = () => rooms;
+export const roomById = (id: string) => rooms.find((r) => r.id === id);
 
 export type Vec2 = [number, number];
 
@@ -47,7 +68,7 @@ export const SPOTS = {
 export type SpotName = keyof typeof SPOTS;
 
 export function randomInRoom(r: RoomDef): Vec2 {
-  return [r.x + (Math.random() - 0.5) * (ROOM_W - 1.6), r.z + (Math.random() - 0.5) * (ROOM_D - 1.6)];
+  return [r.x + (Math.random() - 0.5) * (r.w - 1.6), r.z + (Math.random() - 0.5) * (ROOM_D - 1.6)];
 }
 
 // ---------- Kampus di sekeliling gedung ----------
@@ -121,20 +142,8 @@ export const LEISURE: Leisure[] = [
   { key: "senam-2", at: [PARK.x + 2.2, PARK.z + 6], pose: "stand", act: "stretch", face: Math.PI }
 ];
 
-// Kalimat obrolan ringan. Karakter memakai kalimat divisinya, sesekali kalimat umum.
-export const SMALL_TALK: Record<string, string[]> = {
-  umum: ["Kopi lagi?", "Makan siang di mana?", "Haha, setuju.", "Capek juga ya.", "Nanti sore hujan katanya.", "Semangat!"],
-  pm: ["Timeline masih aman?", "Nanti kita sinkron ya.", "Prioritas minggu ini jelas?"],
-  "software-development": ["Build-nya hijau.", "Siapa yang ubah API-nya?", "Refactor dikit lagi."],
-  "ui-ux-design": ["Kontrasnya kurang, nih.", "Aku coba palet baru.", "Tombolnya kekecilan di ponsel."],
-  devops: ["Server stabil hari ini.", "Deploy jam berapa?", "Log-nya bersih."],
-  "qa-testing": ["Ada bug kecil di form.", "Tesnya lulus semua.", "Sudah dicek di ponsel?"],
-  cybersecurity: ["Jangan lupa ganti kata sandi.", "Dependensinya sudah diaudit.", "Hati-hati link aneh."],
-  "data-analyst": ["Grafiknya naik, lho.", "Datanya agak bolong.", "Rata-ratanya menipu."],
-  "content-creator": ["Caption-nya sudah siap.", "Foto produknya bagus.", "Jadwal posting besok pagi."],
-  "research-content": ["Aku baca riset baru.", "Sumbernya valid kok.", "Pesaing rilis fitur baru."],
-  "infrastructure-network": ["Jaringannya kencang.", "Ping-nya rendah hari ini.", "Kabelnya sudah dirapikan."]
-};
+// Kalimat obrolan umum. Kalimat khas tiap divisi diambil dari `persona.smallTalk` di berkas divisinya.
+export const GENERAL_TALK = ["Kopi lagi?", "Makan siang di mana?", "Haha, setuju.", "Capek juga ya.", "Nanti sore hujan katanya.", "Semangat!"];
 
 // ---------- Tempat ibadah: posisi jamaah di depan tiap bangunan ----------
 export type WorshipStyle = "salat" | "doa-duduk" | "doa-katolik" | "sembah" | "meditasi" | "dupa";

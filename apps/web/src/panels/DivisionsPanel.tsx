@@ -1,9 +1,9 @@
 import { Link, useParams } from "react-router-dom";
 import { ErrorNote, PanelShell } from "../components/PanelShell.tsx";
 import { timeAgo, useFetch } from "../lib/hooks.ts";
-import { lookOf } from "../features/office/looks.ts";
+import { useCoordinatorLabel, useLook } from "../features/office/looks.ts";
 import type { AgentState, AgentStatus } from "../state/reduce.ts";
-import { useDivisions, useOffice } from "../state/store.ts";
+import { useDivisions, useIsPlanTask, useOffice } from "../state/store.ts";
 import { useAgentStatus } from "../state/useAgentStatus.ts";
 import { ApprovalCard } from "./ApprovalCard.tsx";
 import { CharacterCard, ReligionPicker } from "./CharacterCard.tsx";
@@ -41,10 +41,11 @@ function StatusTag({ status }: { status: AgentStatus }) {
 
 function Row({ id, name }: { id: string; name: string }) {
   const { status } = useAgentStatus(id);
+  const look = useLook(id);
   return (
     <li>
       <Link to={`/divisions/${id}`} className="row-link">
-        <span className="swatch" style={{ background: lookOf(id).accent }} aria-hidden />
+        <span className="swatch" style={{ background: look.accent }} aria-hidden />
         <span className="flex-1 text-sm text-ink">{name}</span>
         <StatusTag status={status} />
       </Link>
@@ -87,7 +88,8 @@ interface WorkItem {
 }
 
 function WorkRow({ w, divisionId }: { w: WorkItem; divisionId: string }) {
-  const revisable = (w.status === "done" || w.status === "failed") && !(divisionId === "pm" && w.title === "Menyusun rencana proyek");
+  const isPlanTask = useIsPlanTask();
+  const revisable = (w.status === "done" || w.status === "failed") && !isPlanTask({ divisionId, title: w.title });
   const [label, tone] = TASK_STATUS[w.status] ?? [w.status, ""];
   const summary = w.resultSummary?.trim();
   return (
@@ -130,12 +132,13 @@ function WorkRow({ w, divisionId }: { w: WorkItem; divisionId: string }) {
 
 // Apa yang sedang dan pernah dikerjakan divisi ini, beserta hasilnya.
 function DivisionWork({ id }: { id: string }) {
+  const lead = useCoordinatorLabel();
   const version = useOffice((s) => s.version);
   const { data, error } = useFetch<WorkItem[]>(`/api/divisions/${id}/tasks`, version);
   if (error) return <ErrorNote>{error}</ErrorNote>;
   if (!data) return <p className="text-sm text-ink-muted">Memuat pekerjaan…</p>;
   if (!data.length) {
-    return <p className="text-sm text-ink-muted">Belum ada tugas. Tugas muncul di sini setelah PM membagi rencana proyek ke divisi ini.</p>;
+    return <p className="text-sm text-ink-muted">Belum ada tugas. Tugas muncul di sini setelah {lead} membagi rencana proyek ke divisi ini.</p>;
   }
   const done = data.filter((w) => w.status === "done").length;
   return (
@@ -157,9 +160,10 @@ export function DivisionPanel() {
   const { id = "" } = useParams();
   const division = useDivisions().find((d) => d.id === id);
   const { agent, status } = useAgentStatus(id);
+  const look = useLook(id);
 
   return (
-    <PanelShell title={lookOf(id).name} subtitle={<StatusTag status={status} />}>
+    <PanelShell title={look.name} subtitle={<StatusTag status={status} />}>
       <CharacterCard id={id} divisionName={division?.name ?? id} religion={division?.religion} />
       <p className="text-sm text-ink my-4">{statusLine(status, agent)}</p>
 

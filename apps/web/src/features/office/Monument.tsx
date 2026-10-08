@@ -1,14 +1,23 @@
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import { CanvasTexture, type MeshStandardMaterial, SRGBColorSpace } from "three";
+import { useHouse } from "../../state/store.ts";
 import { atmo } from "./Atmosphere.tsx";
 import { Box } from "./parts.tsx";
 
 const STONE = "#CFC6B4";
 const STONE_DARK = "#A89E8A";
 
+// Nama kantor dipecah dua baris: dua kata terakhir di baris bawah (mis. "Synectra" / "AI House").
+export function splitName(name: string): [string, string] {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return [words[0] ?? "", ""];
+  const tail = words.length >= 3 ? 2 : 1;
+  return [words.slice(0, -tail).join(" "), words.slice(-tail).join(" ")];
+}
+
 // Tulisan pahatan digambar ke kanvas (tanpa unduhan font 3D), lalu dipasang di muka tugu.
-function useInscription() {
+function useInscription(name: string) {
   const texture = useMemo(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 1024;
@@ -33,23 +42,32 @@ function useInscription() {
       g.textAlign = "center";
       g.textBaseline = "middle";
       const family = '"Bricolage Grotesque", system-ui, sans-serif';
-      g.font = `700 190px ${family}`;
-      g.fillText("Synectra", canvas.width / 2, 520);
-      g.font = `600 120px ${family}`;
-      g.fillText("AI House", canvas.width / 2, 740);
+      const [top, bottom] = splitName(name);
+      // ukuran huruf mengecil bila nama panjang, agar tetap di dalam bingkai
+      const fit = (text: string, weight: number, size: number) => {
+        g.font = `${weight} ${size}px ${family}`;
+        const width = g.measureText(text).width;
+        if (width > 860) g.font = `${weight} ${Math.floor((size * 860) / width)}px ${family}`;
+      };
+      fit(top, 700, 190);
+      g.fillText(top, canvas.width / 2, bottom ? 520 : 640);
+      if (bottom) {
+        fit(bottom, 600, 120);
+        g.fillText(bottom, canvas.width / 2, 740);
+      }
       g.fillRect(canvas.width / 2 - 160, 880, 320, 8);
       texture.needsUpdate = true;
     };
     draw();
     // gambar ulang setelah font judul selesai dimuat
     void document.fonts?.ready.then(draw);
-  }, [texture]);
+  }, [texture, name]);
 
   return texture;
 }
 
 export function Monument({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
-  const texture = useInscription();
+  const texture = useInscription(useHouse()?.name ?? "AI House");
   const glow = useRef<MeshStandardMaterial>(null);
   useFrame(() => {
     if (glow.current) glow.current.emissiveIntensity = 0.15 + atmo.lamp * 0.55; // tulisan diterangi lampu sorot saat malam

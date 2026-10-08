@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { Injectable } from "@nestjs/common";
+import YAML from "yaml";
 import { DivisionConfigSchema, type DivisionConfig } from "@ai-house/shared";
 
 export interface DivisionEntity {
@@ -9,7 +10,10 @@ export interface DivisionEntity {
   name: string;
   description: string;
   model: string;
+  role: DivisionConfig["role"];
+  order: number;
   religion?: DivisionConfig["religion"];
+  persona: DivisionConfig["persona"];
   prompt: string;
   promptHash: string;
   permission: DivisionConfig["permission"];
@@ -34,7 +38,19 @@ export class FileDivisionRepository {
     }
 
     const files = fs.readdirSync(this.divisionsDir).filter((f) => f.endsWith(".md"));
-    return files.map((file) => this.loadFile(path.join(this.divisionsDir, file)));
+    return files
+      .map((file) => this.loadFile(path.join(this.divisionsDir, file)))
+      .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  }
+
+  // Divisi yang menyusun rencana dan membagi tugas: yang ber-role "coordinator", atau divisi pertama bila tidak ada.
+  coordinator(): DivisionEntity | null {
+    const all = this.loadAll();
+    return all.find((d) => d.role === "coordinator") ?? all[0] ?? null;
+  }
+
+  coordinatorId(): string | null {
+    return this.coordinator()?.id ?? null;
   }
 
   loadById(id: string): DivisionEntity | null {
@@ -79,82 +95,21 @@ export class FileDivisionRepository {
       name: parsed.name,
       description: parsed.description,
       model: parsed.model,
+      role: parsed.role,
+      order: parsed.order,
       religion: parsed.religion,
+      persona: parsed.persona,
       prompt: parsed.prompt,
       promptHash,
       permission: parsed.permission
     };
   }
 
-  private parseFrontmatter(content: string): { frontmatter: Record<string, any>; body: string } {
+  private parseFrontmatter(content: string): { frontmatter: Record<string, unknown>; body: string } {
     const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
-    if (!match) {
-      return { frontmatter: {}, body: content };
-    }
-
-    const yamlStr = match[1];
-    const body = match[2];
-
-    const lines = yamlStr.split("\n");
-    const frontmatter: Record<string, any> = {};
-
-    let currentObj: any = frontmatter;
-    let currentKey = "";
-    let inArray = false;
-    let arrayKey = "";
-
-    for (const rawLine of lines) {
-      const line = rawLine.trimEnd();
-      if (!line || line.startsWith("#")) continue;
-
-      const indent = rawLine.search(/\S/);
-
-      if (line.includes(":") && !line.trim().startsWith("-")) {
-        inArray = false;
-        const [k, ...v] = line.split(":");
-        const key = k.trim();
-        const val = v.join(":").trim();
-
-        if (indent === 0) {
-          if (!val) {
-            frontmatter[key] = {};
-            currentObj = frontmatter[key];
-            currentKey = key;
-          } else {
-            frontmatter[key] = this.parseVal(val);
-            currentObj = frontmatter;
-            currentKey = key;
-          }
-        } else if (indent === 2) {
-          if (!val) {
-            frontmatter[currentKey][key] = {};
-            currentObj = frontmatter[currentKey][key];
-          } else {
-            frontmatter[currentKey][key] = this.parseVal(val);
-          }
-        } else if (indent === 4) {
-          currentObj[key] = this.parseVal(val);
-        }
-      } else if (line.trim().startsWith("-")) {
-        const item = line.trim().replace(/^-\s*/, "");
-        if (!Array.isArray(currentObj[arrayKey])) {
-          currentObj[arrayKey] = [];
-        }
-        currentObj[arrayKey].push(this.parseVal(item));
-      }
-    }
-
-    return { frontmatter, body };
-  }
-
-  private parseVal(val: string): any {
-    if (val.startsWith("[") && val.endsWith("]")) {
-      const inner = val.slice(1, -1).trim();
-      if (!inner) return [];
-      return inner.split(",").map((s) => s.trim().replace(/^["']|["']$/g, ""));
-    }
-    if (val === "true") return true;
-    if (val === "false") return false;
-    return val.replace(/^["']|["']$/g, "");
+    if (!match) return { frontmatter: {}, body: content };
+    const parsed = YAML.parse(match[1]) as unknown;
+    const frontmatter = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+    return { frontmatter, body: match[2] };
   }
 }

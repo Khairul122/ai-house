@@ -6,8 +6,7 @@ import {
   insideOf,
   laneOf,
   PROMENADE_Z,
-  ROOM_W,
-  ROOMS,
+  getRooms,
   roomById,
   type Vec2
 } from "./layout.ts";
@@ -20,7 +19,7 @@ export type Zone = string;
 export function zoneAt(x: number, z: number): Zone {
   if (Math.abs(x) > FLOOR_HALF_X || Math.abs(z) > FLOOR_HALF_Z) return "outside";
   if (Math.abs(z) <= CORRIDOR_HALF) return "hall";
-  const room = ROOMS.find((r) => Math.abs(x - r.x) <= ROOM_W / 2 && Math.sign(z) === Math.sign(r.z));
+  const room = getRooms().find((r) => Math.abs(x - r.x) <= r.w / 2 && Math.sign(z) === Math.sign(r.z));
   return room?.id ?? "hall";
 }
 

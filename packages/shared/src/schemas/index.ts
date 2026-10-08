@@ -37,13 +37,41 @@ export const ApprovalStatusSchema = z.enum([
 
 export const ReligionSchema = z.enum(["islam", "protestan", "katolik", "hindu", "buddha", "konghucu"]);
 
+export const DivisionRoleSchema = z.enum(["coordinator", "member"]);
+
+export const AccessorySchema = z.enum(["hardhat", "glasses", "hood", "beret", "headphones", "tie", "cap", "bun", "visor", "scarf"]);
+
+// Jenis properti khas di ruangan divisi pada kantor 3D.
+export const RoomSignatureSchema = z.enum(["board", "monitor", "easel", "server", "checklist", "screens", "chart", "camera", "books", "rack"]);
+
+const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+// Tampilan karakter divisi di kantor 3D. Semua opsional: yang kosong diisi otomatis dari id divisi.
+export const PersonaSchema = z.object({
+  name: z.string().optional(),
+  short: z.string().optional(),
+  traits: z.array(z.string()).default([]),
+  shirt: HexColor.optional(),
+  hair: HexColor.optional(),
+  skin: HexColor.optional(),
+  accent: HexColor.optional(),
+  accessory: AccessorySchema.optional(),
+  signature: RoomSignatureSchema.optional(),
+  smallTalk: z.array(z.string()).default([])
+});
+
 export const DivisionConfigSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
   model: z.string(),
+  // "coordinator" menyusun rencana dan membagi tugas; tepat satu divisi sebaiknya memegang peran ini
+  role: DivisionRoleSchema.default("member"),
+  // urutan ruangan di kantor 3D dan daftar divisi (kecil di depan)
+  order: z.coerce.number().default(100),
   // agama karakter divisi di kantor 3D (menentukan tempat dan waktu ibadahnya)
   religion: ReligionSchema.optional(),
+  persona: PersonaSchema.default({}),
   permission: z.object({
     read: z.enum(["allow", "deny"]).default("allow"),
     edit: z.enum(["workspace", "deny"]).default("workspace"),

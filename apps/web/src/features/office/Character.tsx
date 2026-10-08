@@ -5,7 +5,7 @@ import { type Camera, type Group, type OrthographicCamera, Vector3 } from "three
 import type { AgentStatus, Dispatch } from "../../state/reduce.ts";
 import { play, type SoundName } from "../../lib/sound.ts";
 import { env } from "../../state/env.ts";
-import { office, useDivisions } from "../../state/store.ts";
+import { office, useCoordinatorId, useDivisions } from "../../state/store.ts";
 import { useAgentStatus } from "../../state/useAgentStatus.ts";
 import {
   type Act,
@@ -16,7 +16,7 @@ import {
   randomInRoom,
   roomById,
   seatOf,
-  SMALL_TALK,
+  GENERAL_TALK,
   standOf,
   toCorridor,
   type Vec2,
@@ -57,7 +57,7 @@ const WORSHIP_TEXT: Record<string, string> = {
   meditasi: "Meditasi di vihara",
   dupa: "Bersembahyang di klenteng"
 };
-import { type Accessory, lookOf, MAT } from "./looks.ts";
+import { type Accessory, lookOf, MAT, useLook } from "./looks.ts";
 import { Box } from "./parts.tsx";
 import { claim, leaveMeet, markArrived, meetOf, placeIn, proposeChat, releaseAll, setAvailable, turnOf } from "./social.ts";
 import { buildPath, type Zone, zoneAt } from "./walk.ts";
@@ -102,8 +102,8 @@ const inPool = (x: number, z: number) => Math.abs(x - POOL.x) < POOL.w / 2 && Ma
 const shuffle = <T,>(list: T[]) => [...list].sort(() => Math.random() - 0.5);
 
 function lineFor(id: string, turn: number) {
-  const own = SMALL_TALK[id] ?? [];
-  const pool = turn % 3 === 2 ? SMALL_TALK.umum : own.length ? own : SMALL_TALK.umum;
+  const own = lookOf(id).smallTalk;
+  const pool = turn % 3 === 2 || !own.length ? GENERAL_TALK : own;
   let h = 0;
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 997;
   return pool[(turn * 7 + h) % pool.length];
@@ -161,7 +161,9 @@ interface Props {
 
 export function Character({ id, reducedMotion, onSelect }: Props) {
   const room = roomById(id)!;
-  const look = lookOf(id);
+  const look = useLook(id);
+  // koordinator yang mengantar map tugas ke divisi tujuan
+  const isCoordinator = useCoordinatorId() === id;
   const { agent, status } = useAgentStatus(id);
 
   const root = useRef<Group>(null);
@@ -274,7 +276,7 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
 
     // 1. Pilih tujuan dari status asli backend.
     let goal: Goal;
-    if (id === "pm" && status !== "waiting" && !brain.carrying && s.dispatches.length > 0) {
+    if (isCoordinator && status !== "waiting" && !brain.carrying && s.dispatches.length > 0) {
       brain.carrying = s.dispatches[0];
       brain.handoverAt = 0;
       leaveMeet(id);
@@ -355,7 +357,7 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     }
     if (meet && !moving) markArrived(meet, id, now);
 
-    // Serah-terima map tugas oleh PM.
+    // Serah-terima map tugas oleh koordinator.
     if (brain.carrying && !moving && goal.key.startsWith("deliver")) {
       if (!brain.handoverAt) brain.handoverAt = now + 900;
       else if (now > brain.handoverAt) {

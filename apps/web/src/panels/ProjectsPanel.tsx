@@ -1,10 +1,10 @@
 import React, { useId, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ErrorNote, PanelShell } from "../components/PanelShell.tsx";
-import { lookOf } from "../features/office/looks.ts";
+import { lookOf, useCoordinatorLabel } from "../features/office/looks.ts";
 import { postJson, timeAgo, useFetch } from "../lib/hooks.ts";
 import { useAutonomy } from "../state/autonomy.ts";
-import { useDivisions, useOffice } from "../state/store.ts";
+import { useCoordinatorId, useDivisions, useOffice } from "../state/store.ts";
 
 interface Project {
   id: string;
@@ -16,7 +16,7 @@ interface Project {
 
 export const PROJECT_STATUS: Record<string, string> = {
   draft: "Draf",
-  planning: "PM menyusun rencana",
+  planning: "Menyusun rencana",
   plan_review: "Menunggu persetujuan rencana",
   in_progress: "Berjalan",
   completed: "Selesai",
@@ -56,7 +56,9 @@ const EMPTY: Form = { title: "", goal: "", audience: "", scope: "", constraints:
 
 function NewProjectForm() {
   const navigate = useNavigate();
-  const divisions = useDivisions().filter((d) => d.id !== "pm");
+  const coordinator = useCoordinatorId();
+  const lead = useCoordinatorLabel();
+  const divisions = useDivisions().filter((d) => d.id !== coordinator);
   const mode = useAutonomy();
   const [form, setForm] = useState<Form>(EMPTY);
   const [picked, setPicked] = useState<string[]>([]);
@@ -150,7 +152,7 @@ function NewProjectForm() {
 
       <fieldset className="form-group">
         <legend>Divisi yang dilibatkan</legend>
-        <p className="text-xs text-ink-muted -mt-1 mb-1">Kosongkan bila PM yang menentukan.</p>
+        <p className="text-xs text-ink-muted -mt-1 mb-1">Kosongkan bila {lead} yang menentukan.</p>
         <div className="grid grid-cols-2 gap-x-3 gap-y-1">
           {divisions.map((d) => (
             <label key={d.id} className="flex items-center gap-2 text-sm text-ink min-h-[32px]">
@@ -171,7 +173,7 @@ function NewProjectForm() {
       <fieldset className="form-group">
         <legend>Berkas perencanaan</legend>
         <p id={fileHelp} className="text-xs text-ink-muted -mt-1 mb-1">
-          PRD, sitemap, wireframe, logo, atau referensi. Maksimal 10 berkas, 10 MB per berkas, total 25 MB. Disimpan di folder brief/ proyek dan dibaca PM.
+          PRD, sitemap, wireframe, logo, atau referensi. Maksimal 10 berkas, 10 MB per berkas, total 25 MB. Disimpan di folder brief/ proyek dan dibaca {lead}.
         </p>
         <input
           ref={fileInput}
@@ -210,7 +212,7 @@ function NewProjectForm() {
           {busy ? (files.length ? "Mengunggah berkas…" : "Membuat…") : "Buat proyek"}
         </button>
         <span className="text-xs text-ink-muted">
-          {mode === "auto" ? "PM langsung menyusun rencana dan divisi mulai bekerja." : "PM menyusun rencana, lalu menunggu persetujuan Anda."}
+          {mode === "auto" ? `${lead} langsung menyusun rencana dan divisi mulai bekerja.` : `${lead} menyusun rencana, lalu menunggu persetujuan Anda.`}
         </span>
       </div>
     </form>
@@ -218,11 +220,12 @@ function NewProjectForm() {
 }
 
 export function ProjectsPanel() {
+  const lead = useCoordinatorLabel();
   const version = useOffice((s) => s.version);
   const { data, error } = useFetch<Project[]>("/api/projects", version);
 
   return (
-    <PanelShell title="Proyek" subtitle="Tulis permintaan Anda di resepsionis. PM yang akan membaginya.">
+    <PanelShell title="Proyek" subtitle={`Tulis permintaan Anda di resepsionis. ${lead} yang akan membaginya.`}>
       <NewProjectForm />
 
       <h3 className="text-sm font-semibold text-ink mb-1">Semua proyek</h3>

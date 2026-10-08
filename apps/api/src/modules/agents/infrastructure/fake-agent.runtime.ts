@@ -2,13 +2,27 @@ import fs from "node:fs";
 import path from "node:path";
 import type { AgentRuntime, RunEvent, StartRunInput } from "../domain/agent-runtime.port.js";
 
-// Runtime tiruan untuk tes dan pengembangan tanpa model. Divisi di `askFor` meminta izin
+// Prompt perencanaan memuat daftar divisi tujuan ("- id: deskripsi") setelah baris penanda ini.
+const PLAN_MARKER = "divisionId wajib salah satu dari:";
+
+function planTargets(prompt: string): string[] | null {
+  const at = prompt.indexOf(PLAN_MARKER);
+  if (at < 0) return null;
+  return prompt
+    .slice(at + PLAN_MARKER.length)
+    .split("\n")
+    .map((l) => l.match(/^- ([^:]+):/)?.[1]?.trim())
+    .filter((id): id is string => !!id);
+}
+
+// Runtime tiruan untuk tes dan pengembangan tanpa model. Tugas perencanaan dikenali dari prompt-nya,
+// jadi rencana selalu memakai divisi yang benar-benar ada. Divisi di `askFor` meminta izin
 // menjalankan perintah bash dan baru selesai setelah izin dijawab.
 export class FakeAgentRuntime implements AgentRuntime {
   private callbacks = new Map<string, (event: RunEvent) => Promise<void> | void>();
   private pending = new Map<string, () => Promise<void>>();
 
-  constructor(private readonly options: { askFor?: Record<string, string> } = {}) {}
+  constructor(private readonly options: { askFor?: Record<string, string>; planDivisions?: string[] } = {}) {}
 
   async startRun(input: StartRunInput): Promise<void> {
     const emit = async (e: RunEvent) => {
@@ -18,26 +32,20 @@ export class FakeAgentRuntime implements AgentRuntime {
     await emit({ type: "text", content: `Memulai tugas ${input.taskTitle}...` });
     fs.mkdirSync(input.workspacePath, { recursive: true });
 
-    if (input.divisionId === "pm") {
+    const targets = planTargets(input.prompt);
+    if (targets) {
+      // Rencana tiruan: dua divisi pertama dari daftar di prompt (atau `planDivisions`), yang kedua menunggu yang pertama.
+      const ids = (this.options.planDivisions ?? targets).filter((id) => targets.includes(id)).slice(0, 2);
       const plan = {
         title: input.taskTitle,
         goal: input.taskDescription,
-        tasks: [
-          {
-            title: "Desain UI Spec",
-            divisionId: "ui-ux-design",
-            description: "Buat wireframe dan spesifikasi landing page",
-            doneCriteria: "Ada spec.md di folder design",
-            dependsOnTitles: []
-          },
-          {
-            title: "Implementasi Landing Page",
-            divisionId: "software-development",
-            description: "Buat komponen HTML/CSS/JS",
-            doneCriteria: "Tersedia index.html dan styles.css",
-            dependsOnTitles: ["Desain UI Spec"]
-          }
-        ]
+        tasks: ids.map((id, i) => ({
+          title: `Bagian ${id}`,
+          divisionId: id,
+          description: `Kerjakan bagian ${id} untuk tujuan: ${input.taskDescription}`,
+          doneCriteria: `Ada laporan ${id} di folder reports`,
+          dependsOnTitles: i > 0 ? [`Bagian ${ids[i - 1]}`] : []
+        }))
       };
       fs.writeFileSync(path.join(input.workspacePath, "plan.json"), JSON.stringify(plan, null, 2));
     } else {

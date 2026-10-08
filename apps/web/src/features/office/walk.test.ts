@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { EXITS, FLOOR_HALF_X, FLOOR_HALF_Z, insideOf, LEISURE, laneOf, PROMENADE_Z, roomById, SPOTS } from "./layout.ts";
+import { EXITS, FLOOR_HALF_X, FLOOR_HALF_Z, insideOf, LEISURE, laneOf, PROMENADE_Z, roomById, setRoomOrder, SPOTS } from "./layout.ts";
 import { buildPath, zoneAt } from "./walk.ts";
 
 // Titik di dalam jejak gedung tetapi bukan koridor/pintu: rute luar tidak boleh menembusnya.
 const insideBuilding = ([x, z]: [number, number]) => Math.abs(x) < FLOOR_HALF_X - 0.5 && Math.abs(z) > 1.5 && Math.abs(z) < FLOOR_HALF_Z;
+
+// denah dibangun dari daftar divisi; di aplikasi daftar ini datang dari /api/divisions
+setRoomOrder(["content-creator", "ui-ux-design", "pm", "software-development", "research-content", "data-analyst", "qa-testing", "devops", "infrastructure-network", "cybersecurity"]);
 
 describe("buildPath", () => {
   it("di ruangan yang sama langsung ke tujuan", () => {

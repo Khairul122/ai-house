@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ErrorNote, PanelShell } from "../components/PanelShell.tsx";
-import { lookOf } from "../features/office/looks.ts";
+import { lookOf, useCoordinatorLabel } from "../features/office/looks.ts";
 import { postJson, useFetch } from "../lib/hooks.ts";
-import { useDivisionName, useOffice } from "../state/store.ts";
+import { useDivisionName, useIsPlanTask, useOffice } from "../state/store.ts";
 import { PROJECT_STATUS } from "./ProjectsPanel.tsx";
 import { RevisionForm } from "./RevisionForm.tsx";
 
@@ -31,7 +31,6 @@ export const TASK_STATUS: Record<string, [string, string]> = {
   cancelled: ["Dibatalkan", "tag-failed"]
 };
 
-const PLAN_TASK = "Menyusun rencana proyek";
 
 interface WorkFile {
   path: string;
@@ -76,6 +75,7 @@ export function WorkFiles({ projectId, refreshKey }: { projectId: string; refres
 
 function TaskRow({ t, titleOf, onRetry, busy }: { t: Task; titleOf: (id: string) => string; onRetry: () => void; busy: boolean }) {
   const nameOf = useDivisionName();
+  const isPlanTask = useIsPlanTask();
   const [label, tone] = TASK_STATUS[t.status] ?? [t.status, ""];
   const long = (t.resultSummary?.length ?? 0) > 180;
 
@@ -109,7 +109,7 @@ function TaskRow({ t, titleOf, onRetry, busy }: { t: Task; titleOf: (id: string)
               Coba lagi
             </button>
           )}
-          {(t.status === "done" || t.status === "failed") && !(t.divisionId === "pm" && t.title === PLAN_TASK) && (
+          {(t.status === "done" || t.status === "failed") && !isPlanTask(t) && (
             <RevisionForm taskId={t.id} divisionId={t.divisionId} />
           )}
         </div>
@@ -125,6 +125,8 @@ export function ProjectPanel() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmStop, setConfirmStop] = useState(false);
+  const isPlanTask = useIsPlanTask();
+  const lead = useCoordinatorLabel();
 
   const act = (url: string) => {
     setBusy(true);
@@ -144,8 +146,8 @@ export function ProjectPanel() {
 
   const { project, tasks } = data;
   const titleOf = (tid: string) => tasks.find((t) => t.id === tid)?.title ?? "tugas lain";
-  const work = tasks.filter((t) => !(t.divisionId === "pm" && t.title === PLAN_TASK));
-  const planTask = tasks.find((t) => t.divisionId === "pm" && t.title === PLAN_TASK);
+  const work = tasks.filter((t) => !isPlanTask(t));
+  const planTask = tasks.find(isPlanTask);
   const doneCount = work.filter((t) => t.status === "done").length;
   const canStop = project.status === "planning" || project.status === "in_progress";
   // Saat draf, kegagalan rencana sudah tampil di kotak atas bersama tombol menyusun ulang.
@@ -157,21 +159,21 @@ export function ProjectPanel() {
       callout = (
         <>
           {planTask?.status === "failed" && <p className="text-sm text-danger mb-2">{planTask.resultSummary}</p>}
-          <p className="text-sm text-ink mb-3">PM belum menyusun rencana. PM akan memecah tujuan ini menjadi tugas untuk divisi lain, lalu menunggu persetujuan Anda.</p>
+          <p className="text-sm text-ink mb-3">{lead} belum menyusun rencana. {lead} akan memecah tujuan ini menjadi tugas untuk divisi lain, lalu menunggu persetujuan Anda.</p>
           <button type="button" className="btn btn-primary" disabled={busy} onClick={() => act(`/api/projects/${id}/plan`)}>
-            {planTask ? "Minta PM menyusun ulang" : "Minta PM menyusun rencana"}
+            {planTask ? `Minta ${lead} menyusun ulang` : `Minta ${lead} menyusun rencana`}
           </button>
         </>
       );
       break;
     case "planning":
-      callout = <p className="text-sm text-ink">PM sedang menyusun rencana di ruangannya. Rencana muncul di sini begitu selesai.</p>;
+      callout = <p className="text-sm text-ink">{lead} sedang menyusun rencana di ruangannya. Rencana muncul di sini begitu selesai.</p>;
       break;
     case "plan_review":
       callout = (
         <>
           <p className="text-sm text-ink mb-3">
-            PM mengusulkan {work.length} tugas di bawah. Divisi baru mulai bekerja setelah Anda menyetujui rencana.
+            {lead} mengusulkan {work.length} tugas di bawah. Divisi baru mulai bekerja setelah Anda menyetujui rencana.
           </p>
           <div className="flex gap-2 flex-wrap">
             <button type="button" className="btn btn-primary" disabled={busy} onClick={() => act(`/api/projects/${id}/plan/approve`)}>

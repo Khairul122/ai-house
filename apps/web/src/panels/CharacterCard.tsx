@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { RELIGION_LABEL, type Religion } from "../features/office/environment.ts";
-import { lookOf } from "../features/office/looks.ts";
+import { useLook } from "../features/office/looks.ts";
 import { EMOTION_LABEL, mood, NEED_LABEL, type Need, type SimState, simOf } from "../features/office/sims.ts";
 import { fetchJson } from "../lib/api.ts";
 import { reloadDivisions } from "../state/store.ts";
@@ -39,7 +39,7 @@ function Bar({ label, value }: { label: string; value: number }) {
 
 // Kartu karakter ala The Sims: siapa dia, perasaannya, kebutuhannya, dan sedang apa.
 export function CharacterCard({ id, divisionName, religion }: { id: string; divisionName: string; religion?: string }) {
-  const look = lookOf(id);
+  const look = useLook(id);
   const sim = useSim(id);
   const m = mood(sim.needs);
 

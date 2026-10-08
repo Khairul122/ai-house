@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import { ErrorNote } from "../components/PanelShell.tsx";
-import { lookOf } from "../features/office/looks.ts";
+import { useLook } from "../features/office/looks.ts";
 import { postJson } from "../lib/hooks.ts";
 
 // Meminta divisi memperbaiki hasil kerjanya. House membuat tugas "Revisi n: …" yang langsung dikerjakan.
@@ -11,7 +11,7 @@ export function RevisionForm({ taskId, divisionId, onSent }: { taskId: string; d
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const id = useId();
-  const name = lookOf(divisionId).name;
+  const name = useLook(divisionId).name;
 
   if (sent) return <p className="text-xs text-ok basis-full">Revisi dikirim ke {name}. Dikerjakan otomatis; hasilnya muncul sebagai tugas "Revisi".</p>;
 
