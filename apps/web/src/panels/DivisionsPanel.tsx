@@ -6,6 +6,7 @@ import type { AgentState, AgentStatus } from "../state/reduce.ts";
 import { useDivisions, useOffice } from "../state/store.ts";
 import { useAgentStatus } from "../state/useAgentStatus.ts";
 import { ApprovalCard } from "./ApprovalCard.tsx";
+import { CharacterCard, ReligionPicker } from "./CharacterCard.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { TASK_STATUS } from "./ProjectPanel.tsx";
 
@@ -151,8 +152,9 @@ export function DivisionPanel() {
   const { agent, status } = useAgentStatus(id);
 
   return (
-    <PanelShell title={division?.name ?? id} subtitle={<StatusTag status={status} />}>
-      <p className="text-sm text-ink mb-4">{statusLine(status, agent)}</p>
+    <PanelShell title={lookOf(id).name} subtitle={<StatusTag status={status} />}>
+      <CharacterCard id={id} divisionName={division?.name ?? id} religion={division?.religion} />
+      <p className="text-sm text-ink my-4">{statusLine(status, agent)}</p>
 
       {agent?.approval && (
         <div className="mb-5">
@@ -168,6 +170,7 @@ export function DivisionPanel() {
           <p className="text-sm text-ink-muted my-3">{division.description}</p>
           <dl className="space-y-3">
             <ModelPicker key={division.id} divisionId={division.id} current={division.model} />
+            <ReligionPicker key={`agama-${division.id}`} divisionId={division.id} current={division.religion} />
             <Rules label="Boleh tanpa izin" items={division.permission.bash.allow} tone="text-ok" />
             <Rules label="Harus minta izin" items={division.permission.bash.ask} tone="text-warn" />
             <Rules label="Selalu ditolak" items={division.permission.bash.deny} tone="text-danger" />

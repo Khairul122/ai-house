@@ -25,6 +25,38 @@ import {
 } from "./layout.ts";
 import { atmo } from "./Atmosphere.tsx";
 import { type Religion, worshipUntil } from "./environment.ts";
+import { type Doing, type Emotion, emotionOf, lowestNeed, type Need, simOf, stepNeeds } from "./sims.ts";
+
+// 1 detik nyata = 0,25 menit simulasi: kebutuhan berubah terlihat dalam hitungan menit.
+const SIM_MINUTES_PER_SECOND = 0.25;
+
+// Kegiatan santai yang memulihkan tiap kebutuhan.
+const RESTORES: Record<Need, Act[]> = {
+  energi: ["sleep", "coffee"],
+  sosial: ["coffee"],
+  hiburan: ["swim", "read", "relax", "stretch"],
+  spiritual: ["read", "relax"]
+};
+
+const EMOTION_ICONS: Emotion[] = ["senang", "sedih", "kesepian", "lelah", "bosan"];
+
+const ACT_TEXT: Record<string, string> = {
+  sleep: "Tidur",
+  coffee: "Minum kopi di pantry",
+  swim: "Berenang di kolam",
+  read: "Membaca di Taman Baca",
+  relax: "Bersantai",
+  stretch: "Peregangan di taman"
+};
+
+const WORSHIP_TEXT: Record<string, string> = {
+  salat: "Salat di masjid",
+  "doa-duduk": "Berdoa di gereja",
+  "doa-katolik": "Berdoa di gereja",
+  sembah: "Sembahyang di pura",
+  meditasi: "Meditasi di vihara",
+  dupa: "Bersembahyang di klenteng"
+};
 import { type Accessory, lookOf, MAT } from "./looks.ts";
 import { Box } from "./parts.tsx";
 import { claim, leaveMeet, markArrived, meetOf, placeIn, proposeChat, releaseAll, setAvailable, turnOf } from "./social.ts";
@@ -147,6 +179,7 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
   const talk = useRef<HTMLDivElement>(null);
   const talkAnchor = useRef<Group>(null);
   const umbrella = useRef<Group>(null);
+  const emotionIcons = useRef<Group>(null);
   const incense = useRef<Group>(null);
   const religion = useDivisions().find((d) => d.id === id)?.religion as Religion | undefined;
 
@@ -188,7 +221,10 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     const r = Math.random();
     if (r < 0.16) return sitGoal(n);
     if (r < 0.26) return { key: n, zone: id, at: randomInRoom(room), pose: "stand" };
-    if (r < 0.42 && proposeChat(id, [brain.x, brain.z], now)) return brain.goal; // obrolan diambil alih oleh meetOf
+    const sim = simOf(id);
+    const need = lowestNeed(sim.needs);
+    const urgent = sim.needs[need] < 55;
+    if (((urgent && need === "sosial") || (!urgent && r < 0.42)) && proposeChat(id, [brain.x, brain.z], now)) return brain.goal; // obrolan diambil alih oleh meetOf
     // hujan: tetap di dalam gedung; dingin: tidak berenang; panas: kolam ramai; malam: lebih banyak tidur
     const w = atmo.weather;
     const night = atmo.phase === "malam";
@@ -204,7 +240,9 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       if (night && l.act === "sleep") weight = 3;
       return Array<typeof l>(weight).fill(l);
     });
-    for (const spot of shuffle(options)) {
+    // kebutuhan mendesak: utamakan tempat yang memulihkannya
+    const wanted = urgent ? options.filter((l) => RESTORES[need].includes(l.act)) : [];
+    for (const spot of [...shuffle(wanted), ...shuffle(options)]) {
       if (!claim(spot.key, id)) continue;
       return { key: `${n}-${spot.key}`, zone: zoneAt(spot.at[0], spot.at[1]), at: spot.at, pose: spot.pose, face: spot.face, act: spot.act };
     }
@@ -298,7 +336,9 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       const dx = tx - brain.x;
       const dz = tz - brain.z;
       const dist = Math.hypot(dx, dz);
-      const step = SPEED * (inPool(brain.x, brain.z) ? 0.5 : 1) * dt;
+      const e = simOf(id).emotion;
+      const mood = e === "sedih" || e === "kesepian" ? 0.7 : e === "lelah" ? 0.75 : e === "senang" ? 1.15 : 1;
+      const step = SPEED * mood * (inPool(brain.x, brain.z) ? 0.5 : 1) * dt;
       if (dist <= step) {
         brain.x = tx;
         brain.z = tz;
@@ -485,6 +525,63 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     if (umbrellaOn) ar = -2.0;
     if (brain.carrying && status !== "waiting") ar = moving ? -0.6 : -1.0;
 
+    // ---------- simulasi kebutuhan dan emosi ----------
+    const sim = simOf(id);
+    const doing: Doing =
+      act === "worship"
+        ? "ibadah"
+        : status === "working" && !moving
+          ? "kerja"
+          : moving
+            ? "jalan"
+            : act === "sleep"
+              ? "tidur"
+              : act === "coffee"
+                ? "kopi"
+                : act === "chat" && meet && turnOf(meet, now)
+                  ? "ngobrol"
+                  : act === "swim"
+                    ? "berenang"
+                    : act === "read"
+                      ? "membaca"
+                      : act === "relax" || act === "stretch"
+                        ? "taman"
+                        : "diam";
+    sim.needs = stepNeeds(sim.needs, doing, dt * SIM_MINUTES_PER_SECOND);
+    const emotion = emotionOf(sim.needs, status, doing);
+    sim.emotion = emotion;
+    sim.activity = brain.carrying
+      ? `Mengantar map tugas ke ${lookOf(brain.carrying.to).name}`
+      : status === "working"
+        ? `Mengerjakan "${agent?.task?.title ?? "tugas"}"`
+        : status === "waiting"
+          ? "Menunggu izin untuk melanjutkan"
+          : status === "failed"
+            ? "Memikirkan tugas yang gagal"
+            : act === "worship" && goal.style
+              ? WORSHIP_TEXT[goal.style]
+              : act === "chat" && meet
+                ? `Ngobrol dengan ${lookOf(meet.a === id ? meet.b : meet.a).name}`
+                : act === "sleep"
+                  ? pose === "lie" && goal.at[1] < 5
+                    ? "Tidur siang di sofa"
+                    : "Tidur di kursi berjemur"
+                  : act && ACT_TEXT[act]
+                    ? ACT_TEXT[act]
+                    : moving
+                      ? "Berjalan"
+                      : "Santai di ruangannya";
+
+    // bahasa tubuh sesuai emosi (hanya saat tidak sedang melakukan sesuatu yang khusus)
+    const free = !act && !moving && pose === "stand" && status === "idle";
+    if (emotion === "sedih" || emotion === "kesepian") hx = Math.max(hx, 0.4);
+    if (emotion === "lelah") bx = Math.max(bx, 0.15);
+    if (free && emotion === "senang" && Math.sin(t * 2.1 + id.length) > 0.92) y = 0.18; // lompat kecil
+    if (free && (emotion === "bosan" || emotion === "lelah") && Math.sin(t * 0.9 + id.length) > 0.93) {
+      al = ar = -2.8; // menguap sambil meregang
+      hx = -0.4;
+    }
+
     const k = Math.min(1, dt * 10);
     const ease = (obj: Group | null, axis: "x" | "y" | "z", v: number) => {
       if (obj) obj.rotation[axis] += (v - obj.rotation[axis]) * k;
@@ -517,6 +614,17 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     if (book.current) book.current.visible = act === "read" && !brain.carrying;
     if (cup.current) cup.current.visible = act === "coffee" && !brain.carrying;
     if (umbrella.current) umbrella.current.visible = umbrellaOn;
+    const icons = emotionIcons.current;
+    if (icons) {
+      const showIcon = status !== "waiting" && !(act === "chat") && !(act === "sleep" && pose === "lie") && pose !== "swim";
+      icons.visible = showIcon;
+      icons.position.y = (pose === "lie" ? 1.0 : 2.05) + Math.sin(t * 2) * 0.04;
+      icons.position.z = pose === "lie" ? -1.15 : 0;
+      icons.children.forEach((c, i) => {
+        c.visible = EMOTION_ICONS[i] === emotion;
+      });
+      icons.rotation.y = -g.rotation.y + Math.PI / 4; // selalu menghadap kamera bawaan
+    }
     if (incense.current) incense.current.visible = act === "worship" && goal.style === "dupa";
 
     // suara interaksi, hanya bila karakter terlihat dan kamera cukup dekat
@@ -633,6 +741,37 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
             )}
             <HeadGear kind={look.accessory} accent={look.accent} hair={look.hair} shirt={look.shirt} />
           </group>
+        </group>
+      </group>
+
+      {/* ikon emosi di atas kepala, urutan sama dengan EMOTION_ICONS */}
+      <group ref={emotionIcons} position={[0, 2.05, 0]}>
+        <group>
+          {/* senang: hati */}
+          <Box p={[-0.07, 0.05, 0]} s={[0.13, 0.13, 0.06]} c="#E5677A" emissive="#E5677A" glow={0.4} shadow={false} />
+          <Box p={[0.07, 0.05, 0]} s={[0.13, 0.13, 0.06]} c="#E5677A" emissive="#E5677A" glow={0.4} shadow={false} />
+          <Box p={[0, -0.04, 0]} s={[0.14, 0.14, 0.06]} c="#E5677A" emissive="#E5677A" glow={0.4} shadow={false} rotation={[0, 0, Math.PI / 4]} />
+        </group>
+        <group>
+          {/* sedih: tetes air mata */}
+          <Box p={[0, -0.03, 0]} s={[0.14, 0.14, 0.06]} c="#5B8DD6" emissive="#5B8DD6" glow={0.4} shadow={false} rotation={[0, 0, Math.PI / 4]} />
+          <Box p={[0, 0.09, 0]} s={[0.06, 0.08, 0.06]} c="#5B8DD6" emissive="#5B8DD6" glow={0.4} shadow={false} />
+        </group>
+        <group>
+          {/* kesepian: tetes kecil pucat */}
+          <Box p={[0, 0, 0]} s={[0.1, 0.1, 0.06]} c="#9BB3D6" emissive="#9BB3D6" glow={0.3} shadow={false} rotation={[0, 0, Math.PI / 4]} />
+        </group>
+        <group>
+          {/* lelah: baterai hampir habis */}
+          <Box p={[0, 0, 0]} s={[0.3, 0.14, 0.05]} c="#3A3A3A" shadow={false} />
+          <Box p={[0.17, 0, 0]} s={[0.04, 0.07, 0.05]} c="#3A3A3A" shadow={false} />
+          <Box p={[-0.1, 0, 0.01]} s={[0.06, 0.09, 0.05]} c="#D9534F" emissive="#D9534F" glow={0.5} shadow={false} />
+        </group>
+        <group>
+          {/* bosan: tiga titik */}
+          {[-0.11, 0, 0.11].map((x) => (
+            <Box key={x} p={[x, 0, 0]} s={[0.07, 0.07, 0.05]} c="#8A8A85" shadow={false} />
+          ))}
         </group>
       </group>
 
