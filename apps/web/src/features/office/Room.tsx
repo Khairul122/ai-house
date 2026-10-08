@@ -5,12 +5,12 @@ import { type Mesh, Vector3 } from "three";
 import type { AgentStatus } from "../../state/reduce.ts";
 import { useAgentStatus } from "../../state/useAgentStatus.ts";
 import { ROOM_D, ROOM_W, type RoomDef, WALL_H } from "./layout.ts";
-import { lookOf, MAT } from "./looks.ts";
+import { lookOf, MAT, type Signature as SignatureKind, useLook } from "./looks.ts";
 import { Box, type V3 } from "./parts.tsx";
 import { StaticBatch } from "./StaticBatch.tsx";
 
 // Properti khas yang tidak bergantung status dan tidak bisa diklik (boleh digabung).
-const STATIC_SIGNATURE = new Set(["ui-ux-design", "qa-testing", "cybersecurity", "data-analyst", "research-content", "infrastructure-network"]);
+const STATIC_SIGNATURE = new Set<SignatureKind>(["easel", "checklist", "screens", "chart", "books", "rack"]);
 
 const HW = ROOM_W / 2;
 const HD = ROOM_D / 2;
@@ -60,11 +60,12 @@ function Monitor({ p, status, ry = 0 }: { p: V3; status: AgentStatus; ry?: numbe
   );
 }
 
-// Properti khas tiap divisi, dalam koordinat lokal ruangan (koridor di +z).
+// Properti khas ruangan sesuai `persona.signature` divisi, dalam koordinat lokal ruangan (koridor di +z).
+// Papan tugas ("board") bisa diklik untuk membuka daftar proyek.
 function Signature({ id, status, onBoard }: { id: string; status: AgentStatus; onBoard: (e: ThreeEvent<MouseEvent>) => void }) {
-  const accent = lookOf(id).accent;
-  switch (id) {
-    case "pm":
+  const { accent, signature } = lookOf(id);
+  switch (signature) {
+    case "board":
       return (
         <group position={[-1.1, 0, -HD + 0.1]} onClick={onBoard}>
           <Box p={[0, 1.05, 0]} s={[1.5, 0.9, 0.05]} c="#F4EEDF" />
@@ -75,9 +76,9 @@ function Signature({ id, status, onBoard }: { id: string; status: AgentStatus; o
           )}
         </group>
       );
-    case "software-development":
+    case "monitor":
       return <Monitor p={[0.62, 0.75, -0.02]} status={status} ry={-0.45} />;
-    case "ui-ux-design":
+    case "easel":
       return (
         <group position={[-1.45, 0, -1.0]} rotation={[0, 0.5, 0]}>
           <Box p={[-0.25, 0.6, 0]} s={[0.05, 1.2, 0.05]} c={MAT.woodDark} />
@@ -87,7 +88,7 @@ function Signature({ id, status, onBoard }: { id: string; status: AgentStatus; o
           <Box p={[0.15, 0.95, 0.06]} s={[0.22, 0.12, 0.01]} c="#3D6B8C" shadow={false} />
         </group>
       );
-    case "devops": {
+    case "server": {
       const led = status === "failed" ? MAT.failed : status === "idle" ? "#3B6B4A" : MAT.done;
       return (
         <group position={[-1.6, 0, -1.4]}>
@@ -98,7 +99,7 @@ function Signature({ id, status, onBoard }: { id: string; status: AgentStatus; o
         </group>
       );
     }
-    case "qa-testing":
+    case "checklist":
       return (
         <group position={[-1.1, 0, -HD + 0.1]}>
           <Box p={[0, 1.05, 0]} s={[1.4, 0.85, 0.05]} c="#FAFAF7" />
@@ -110,7 +111,7 @@ function Signature({ id, status, onBoard }: { id: string; status: AgentStatus; o
           ))}
         </group>
       );
-    case "cybersecurity":
+    case "screens":
       return (
         <group position={[-1.1, 0, -HD + 0.1]}>
           {[
@@ -123,7 +124,7 @@ function Signature({ id, status, onBoard }: { id: string; status: AgentStatus; o
           ))}
         </group>
       );
-    case "data-analyst":
+    case "chart":
       return (
         <group position={[-1.1, 0, -HD + 0.1]}>
           <Box p={[0, 1.05, 0]} s={[1.3, 0.85, 0.05]} c="#F4EEDF" />
@@ -132,7 +133,7 @@ function Signature({ id, status, onBoard }: { id: string; status: AgentStatus; o
           ))}
         </group>
       );
-    case "content-creator":
+    case "camera":
       return (
         <group position={[-1.4, 0, -0.5]}>
           <Box p={[0, 0.55, 0]} s={[0.05, 1.1, 0.05]} c={MAT.metal} />
@@ -144,7 +145,7 @@ function Signature({ id, status, onBoard }: { id: string; status: AgentStatus; o
           <Box p={[0.3, 0.6, -0.9]} s={[0.04, 1.2, 0.04]} c={MAT.metal} />
         </group>
       );
-    case "research-content":
+    case "books":
       return (
         <group position={[-1.8, 0, -1.0]}>
           <Box p={[0, 0.75, 0]} s={[0.4, 1.5, 1.2]} c={MAT.woodDark} />
@@ -155,7 +156,7 @@ function Signature({ id, status, onBoard }: { id: string; status: AgentStatus; o
           )}
         </group>
       );
-    case "infrastructure-network":
+    case "rack":
       return (
         <group position={[-1.6, 0, -1.5]}>
           <Box p={[0, 0.5, 0]} s={[0.55, 1.0, 0.45]} c={MAT.metal} />
@@ -181,7 +182,8 @@ interface RoomProps {
 export function Room({ room, selected, onSelect, onBoard }: RoomProps) {
   const { status } = useAgentStatus(room.id);
   const [hover, setHover] = useState(false);
-  const look = lookOf(room.id);
+  const look = useLook(room.id);
+  const fixed = STATIC_SIGNATURE.has(look.signature);
   const flip = room.side === "s" ? -1 : 1; // normal dinding dalam koordinat dunia
   const lamp = status === "idle" ? null : SCREEN[status][0];
 
@@ -191,7 +193,7 @@ export function Room({ room, selected, onSelect, onBoard }: RoomProps) {
   };
 
   return (
-    <group position={[room.x, 0, room.z]}>
+    <group position={[room.x, 0, room.z]} scale={[room.w / ROOM_W, 1, 1]}>
       {/* Area klik: satu kotak tak terlihat seluas lantai, bukan ratusan mesh ruangan. */}
       <mesh
         visible={false}
@@ -251,11 +253,11 @@ export function Room({ room, selected, onSelect, onBoard }: RoomProps) {
           <Box p={[0, 0.42, -0.95]} s={[0.5, 0.07, 0.5]} c="#4A4E54" />
           <Box p={[0, 0.72, -1.2]} s={[0.5, 0.55, 0.07]} c="#4A4E54" />
           <Plant p={[HW - 0.35, 0, -HD + 0.35]} />
-          {STATIC_SIGNATURE.has(room.id) && <Signature id={room.id} status={status} onBoard={handleBoard} />}
+          {fixed && <Signature id={room.id} status={status} onBoard={handleBoard} />}
         </StaticBatch>
         <Monitor p={[0, 0.75, 0.0]} status={status} />
         {/* properti yang berubah sesuai status atau bisa diklik tetap terpisah */}
-        {!STATIC_SIGNATURE.has(room.id) && <Signature id={room.id} status={status} onBoard={handleBoard} />}
+        {!fixed && <Signature id={room.id} status={status} onBoard={handleBoard} />}
 
         <Html position={[0, WALL_H + 0.25, HD]} center zIndexRange={[10, 0]} pointerEvents="none">
           <div className={`room-sign${selected ? " is-selected" : ""}`} style={{ borderColor: look.accent }}>

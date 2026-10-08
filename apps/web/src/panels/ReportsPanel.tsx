@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { ErrorNote, PanelShell } from "../components/PanelShell.tsx";
-import { lookOf } from "../features/office/looks.ts";
+import { lookOf, useCoordinatorLabel } from "../features/office/looks.ts";
 import { timeAgo, useFetch } from "../lib/hooks.ts";
 import { useDivisionName, useOffice } from "../state/store.ts";
 import { TASK_STATUS, WorkFiles } from "./ProjectPanel.tsx";
@@ -37,6 +37,7 @@ const DECIDED: Record<string, string> = { approved: "dijalankan", rejected: "dit
 
 // Daftar laporan: proyek yang sudah direncanakan, terbaru dulu.
 export function ReportsPanel() {
+  const lead = useCoordinatorLabel();
   const version = useOffice((s) => s.version);
   const { data, error } = useFetch<Project[]>("/api/projects", version);
   const shown = data?.filter((p) => p.status !== "draft" && !p.title.startsWith("Demo:"));
@@ -44,7 +45,7 @@ export function ReportsPanel() {
   return (
     <PanelShell title="Laporan" subtitle="Hasil kerja tiap proyek. Divisi bekerja sendiri; Anda cukup membaca di sini.">
       {error && <ErrorNote>{error}</ErrorNote>}
-      {shown?.length === 0 && <p className="text-sm text-ink-muted">Belum ada laporan. Buat proyek di Resepsionis, PM akan langsung merencanakan dan divisi mulai bekerja.</p>}
+      {shown?.length === 0 && <p className="text-sm text-ink-muted">Belum ada laporan. Buat proyek di Resepsionis, {lead} akan langsung merencanakan dan divisi mulai bekerja.</p>}
       <ul className="divide-y divide-line border-y border-line">
         {shown?.map((p) => (
           <li key={p.id}>

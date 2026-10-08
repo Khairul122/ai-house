@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { Atmosphere } from "./Atmosphere.tsx";
 import { Campus } from "./Campus.tsx";
 import { Character } from "./Character.tsx";
-import { CORRIDOR_HALF, FLOOR_HALF_X, FLOOR_HALF_Z, ROOMS, roomById } from "./layout.ts";
+import { useHouse, useRooms } from "../../state/store.ts";
+import { CORRIDOR_HALF, FLOOR_HALF_X, FLOOR_HALF_Z, roomById } from "./layout.ts";
 import { MAT } from "./looks.ts";
 import { Box } from "./parts.tsx";
 import { Room } from "./Room.tsx";
@@ -189,6 +190,8 @@ export default function OfficeCanvas(props: OfficeProps) {
   const { selectedId, onSelect, reducedMotion, onOpenProjects } = props;
   // Mulai di kualitas menengah; naik bila perangkat kuat, turun bila frame mulai tersendat.
   const [quality, setQuality] = useState<Quality>(() => (window.innerWidth < 768 ? "low" : "mid"));
+  const rooms = useRooms();
+  const houseName = useHouse()?.name ?? "AI House";
   return (
     <Canvas
       shadows
@@ -197,7 +200,7 @@ export default function OfficeCanvas(props: OfficeProps) {
       dpr={Math.min(DPR[quality], window.devicePixelRatio || 1)}
       camera={{ position: [20, 22, 20], zoom: 30, near: 0.1, far: 400 }}
       gl={{ antialias: quality !== "high", alpha: false, powerPreference: "high-performance", stencil: false }}
-      aria-label="Kantor 3D Synectra AI House"
+      aria-label={`Kantor 3D ${houseName}`}
     >
       <PerformanceMonitor
         bounds={() => [24, 50]}
@@ -209,10 +212,10 @@ export default function OfficeCanvas(props: OfficeProps) {
       <FrameDriver />
       <Atmosphere />
 
-      {ROOMS.map((r) => (
+      {rooms.map((r) => (
         <Room key={r.id} room={r} selected={selectedId === r.id} onSelect={onSelect} onBoard={onOpenProjects} />
       ))}
-      {ROOMS.map((r) => (
+      {rooms.map((r) => (
         <Character key={r.id} id={r.id} reducedMotion={reducedMotion} onSelect={onSelect} />
       ))}
       <Commons onOpenProjects={onOpenProjects} />

@@ -38,7 +38,7 @@ describe("Orkestrasi proyek (runtime tiruan)", () => {
     const audit = new AuditService();
     const eventBus = new EventBusService();
     const approvals = new ApprovalService(audit, eventBus);
-    const runtime = new FakeAgentRuntime({ askFor: { "software-development": "npm install express" } });
+    const runtime = new FakeAgentRuntime({ askFor: { "software-development": "npm install express" }, planDivisions: ["ui-ux-design", "software-development"] });
     const orchestrator = new mods.orch.OrchestratorService(runtime, eventBus, audit, approvals, new TaskService(), new FileDivisionRepository());
     orchestrator.listen();
     return { orchestrator, approvals, projects: new ProjectService(audit, eventBus) };

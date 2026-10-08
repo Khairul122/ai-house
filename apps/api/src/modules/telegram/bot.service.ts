@@ -108,19 +108,19 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       const { tasks } = await this.orchestrator.detail(p.id);
       const titleOf = new Map(tasks.map((t) => [t.id, t.title]));
       const lines = tasks
-        .filter((t) => !(t.divisionId === "pm" && t.title === PLAN_TASK_TITLE))
+        .filter((t) => !(t.divisionId === this.divisions.coordinatorId() && t.title === PLAN_TASK_TITLE))
         .map((t, i) => {
           const after = t.dependsOn.map((id) => titleOf.get(id)).filter(Boolean);
           return `${i + 1}. [${this.divisionName(t.divisionId)}] ${t.title}${after.length ? ` (setelah: ${after.join(", ")})` : ""}`;
         });
       await this.send(
-        `Rencana PM untuk "${p.title}":\n\n${lines.join("\n")}\n\nSetujui agar divisi mulai bekerja?`,
+        `Rencana ${this.divisionName(this.divisions.coordinatorId())} untuk "${p.title}":\n\n${lines.join("\n")}\n\nSetujui agar divisi mulai bekerja?`,
         new InlineKeyboard().text("Setujui rencana", `plan:${p.id}:approve`).text("Tolak", `plan:${p.id}:reject`)
       );
     } else if (p.status === "completed") {
       const { tasks } = await this.orchestrator.detail(p.id);
       const lines = tasks.map((t) => `- ${this.divisionName(t.divisionId)}: ${t.title}\n  ${t.resultSummary ?? ""}`.trimEnd());
-      await this.send(`Laporan PM: proyek "${p.title}" selesai.\n\n${lines.join("\n")}`);
+      await this.send(`Laporan ${this.divisionName(this.divisions.coordinatorId())}: proyek "${p.title}" selesai.\n\n${lines.join("\n")}`);
     } else if (p.status === "failed") {
       await this.send(`Proyek "${p.title}" berhenti karena ada tugas gagal. Buka dashboard untuk melihat sebabnya dan mencoba lagi.`);
     }

@@ -4,6 +4,8 @@ import { db } from "../../db/index.js";
 import { approvals, runs, tasks } from "../../db/schema/index.js";
 import { AuditService } from "../audit/audit.service.js";
 import { FileDivisionRepository } from "../divisions/infrastructure/file-division.repository.js";
+import { PLAN_TASK_TITLE } from "../orchestrator/orchestrator.service.js";
+import { getHouseProfile } from "../settings/house.js";
 import { deriveOfficeState } from "./office-state.js";
 
 export function listPendingApprovals() {
@@ -38,6 +40,12 @@ export class OfficeController {
     const divisionIds = this.divisionRepo.loadAll().map((d) => d.id);
     const taskRows = await db.query.tasks.findMany();
     return deriveOfficeState(divisionIds, taskRows, await listPendingApprovals());
+  }
+
+  // Profil kantor dan divisi koordinatornya, dipakai dashboard menggantikan nilai tetap di kode.
+  @Get("house")
+  house() {
+    return { ...getHouseProfile(), coordinatorId: this.divisionRepo.coordinatorId(), planTaskTitle: PLAN_TASK_TITLE };
   }
 
   @Get("audit")

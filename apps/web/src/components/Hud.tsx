@@ -4,7 +4,7 @@ import { type Phase, PHASE_LABEL, type Weather, WEATHER_LABEL } from "../feature
 import { postJson } from "../lib/hooks.ts";
 import { type Autonomy, setAutonomy, useAutonomy } from "../state/autonomy.ts";
 import { env, useEnv } from "../state/env.ts";
-import { useOffice } from "../state/store.ts";
+import { useHouse, useOffice } from "../state/store.ts";
 
 function summary(statuses: string[]): string {
   const working = statuses.filter((s) => s === "working").length;
@@ -49,6 +49,7 @@ function Ambience() {
   const tempC = useEnv((st) => st.tempC);
   const sound = useEnv((st) => st.sound);
   const mode = useAutonomy();
+  const city = useHouse()?.city;
   const [modeError, setModeError] = useState<string | null>(null);
 
   return (
@@ -70,7 +71,7 @@ function Ambience() {
           <span>Cuaca</span>
           <select value={weatherMode} onChange={(e) => env.setWeather(e.target.value as Weather | "auto")}>
             <option value="auto">
-              Cuaca nyata Bandung ({WEATHER_LABEL[autoWeather]}
+              Cuaca nyata{city ? ` ${city}` : ""} ({WEATHER_LABEL[autoWeather]}
               {tempC !== null ? `, ${tempC}°C` : ""})
             </option>
             {(Object.keys(WEATHER_LABEL) as Weather[]).map((w) => (
@@ -111,6 +112,7 @@ export function Hud({ selectedId }: { selectedId: string | null }) {
   const full = useFullscreen();
   const navigate = useNavigate();
   const connection = useOffice((s) => s.connection);
+  const house = useHouse();
   const statuses = useOffice((s) => Object.values(s.agents).map((a) => a.status).join(","));
   const [demoError, setDemoError] = useState<string | null>(null);
   const [demoBusy, setDemoBusy] = useState(false);
@@ -126,7 +128,7 @@ export function Hud({ selectedId }: { selectedId: string | null }) {
   return (
     <div className="hud">
       <div className="hud-card">
-        <h1 className="font-display text-lg leading-none text-ink">Synectra AI House</h1>
+        <h1 className="font-display text-lg leading-none text-ink">{house?.name ?? "AI House"}</h1>
         <p className="text-xs text-ink-muted mt-1">{summary(statuses ? statuses.split(",") : [])}</p>
         <p className="text-xs text-ink-muted">
           {PHASE_LABEL[phase]} · {env.now().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} · {WEATHER_LABEL[weather]}

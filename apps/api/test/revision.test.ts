@@ -41,7 +41,7 @@ describe("brief dan revisi", () => {
 
     const audit = new AuditService();
     const eventBus = new EventBusService();
-    const orchestrator = new OrchestratorService(new RecordingRuntime(), eventBus, audit, new ApprovalService(audit, eventBus), new TaskService(), new FileDivisionRepository());
+    const orchestrator = new OrchestratorService(new RecordingRuntime({ planDivisions: ["ui-ux-design", "software-development"] }), eventBus, audit, new ApprovalService(audit, eventBus), new TaskService(), new FileDivisionRepository());
     orchestrator.listen();
 
     const project = await new ProjectService(audit, eventBus).createProject("Toko kue", "Landing page pesanan kue");
@@ -56,7 +56,7 @@ describe("brief dan revisi", () => {
     // revisi tugas desain
     const design = (await orchestrator.detail(project.id)).tasks.find((t) => t.divisionId === "ui-ux-design")!;
     const rev = await orchestrator.reviseTask(design.id, "Warna utama ganti cokelat karamel, tombol pesan lebih besar.");
-    expect(rev.title).toBe("Revisi 1: Desain UI Spec");
+    expect(rev.title).toBe("Revisi 1: Bagian ui-ux-design");
     expect(rev.divisionId).toBe("ui-ux-design");
     await waitFor(async () => (await status()) === "completed");
     const after = (await orchestrator.detail(project.id)).tasks.find((t) => t.id === rev.id)!;
@@ -67,13 +67,13 @@ describe("brief dan revisi", () => {
 
     // revisi kedua dari revisi pertama tetap bernomor berurutan
     const rev2 = await orchestrator.reviseTask(rev.id, "Tambahkan foto produk di hero.");
-    expect(rev2.title).toBe("Revisi 2: Desain UI Spec");
+    expect(rev2.title).toBe("Revisi 2: Bagian ui-ux-design");
     await waitFor(async () => (await status()) === "completed");
 
     // aturan: catatan wajib, rencana PM tidak direvisi lewat sini
     await expect(orchestrator.reviseTask(design.id, " ")).rejects.toThrow(/catatan revisi/);
     const plan = (await orchestrator.detail(project.id)).tasks.find((t) => t.divisionId === "pm")!;
-    await expect(orchestrator.reviseTask(plan.id, "Ubah rencana")).rejects.toThrow(/Rencana PM/);
+    await expect(orchestrator.reviseTask(plan.id, "Ubah rencana")).rejects.toThrow(/Rencana koordinator/);
 
     fs.rmSync(project.workspacePath, { recursive: true, force: true });
   });

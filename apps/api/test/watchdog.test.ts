@@ -46,7 +46,7 @@ describe("pengawas run macet", () => {
     const audit = new AuditService();
     const eventBus = new EventBusService();
     const orchestrator = new OrchestratorService(
-      new HangingRuntime(),
+      new HangingRuntime({ planDivisions: ["ui-ux-design", "software-development"] }),
       eventBus,
       audit,
       new ApprovalService(audit, eventBus),

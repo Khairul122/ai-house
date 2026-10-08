@@ -1,3 +1,5 @@
+import { getDivisions, useCoordinatorId, useDivisions } from "../../state/store.ts";
+
 export type Accessory =
   | "hardhat"
   | "glasses"
@@ -21,21 +23,63 @@ export interface Look {
   accessory: Accessory;
 }
 
-export const LOOKS: Record<string, Look> = {
-  pm: { name: "Raka Pratama", traits: ["Terorganisir", "Pecinta kopi", "Pemimpin rapat"], short: "PM", shirt: "#3F4A5A", hair: "#2B1E16", skin: "#E2B48C", accent: "#B4410F", accessory: "tie" },
-  "software-development": { name: "Dimas Arya", traits: ["Fokus tinggi", "Suka musik lo-fi", "Pemburu bug"], short: "Dev", shirt: "#4A5A3F", hair: "#1C1A17", skin: "#C98E64", accent: "#5B7F3A", accessory: "headphones" },
-  "ui-ux-design": { name: "Maria Clara", traits: ["Perfeksionis warna", "Kreatif", "Kolektor sketsa"], short: "Desain", shirt: "#EADFCB", hair: "#7A3B1E", skin: "#F0C9A4", accent: "#A8452E", accessory: "beret" },
-  devops: { name: "Fajar Nugraha", traits: ["Tenang di bawah tekanan", "Bangun pagi", "Penjaga server"], short: "DevOps", shirt: "#5B4A3A", hair: "#3A2A1C", skin: "#B57C55", accent: "#D49A1F", accessory: "hardhat" },
-  "qa-testing": { name: "Grace Natalia", traits: ["Teliti", "Kritis", "Suka teka-teki"], short: "QA", shirt: "#6B7B83", hair: "#4A3826", skin: "#E8BE98", accent: "#2F6F7A", accessory: "glasses" },
-  cybersecurity: { name: "Hendra Gunawan", traits: ["Waspada", "Pendiam", "Burung malam"], short: "Cyber", shirt: "#2E2F33", hair: "#121212", skin: "#D6A47C", accent: "#4F5D75", accessory: "hood" },
-  "data-analyst": { name: "Debora Wijaya", traits: ["Logis", "Suka grafik", "Pembaca buku"], short: "Data", shirt: "#7A5C46", hair: "#5A3A22", skin: "#F2D0B0", accent: "#3D6B8C", accessory: "bun" },
-  "content-creator": { name: "Made Ayu Lestari", traits: ["Ekspresif", "Suka foto", "Ramah"], short: "Konten", shirt: "#C9A27A", hair: "#2A1A12", skin: "#9C6B48", accent: "#B85C38", accessory: "cap" },
-  "research-content": { name: "Liana Setiawan", traits: ["Ingin tahu", "Kutu buku", "Sabar"], short: "Riset", shirt: "#556B5E", hair: "#8C8C88", skin: "#EBC7A2", accent: "#6B5B95", accessory: "scarf" },
-  "infrastructure-network": { name: "Bayu Saputra", traits: ["Praktis", "Suka olahraga", "Teknisi andal"], short: "Infra", shirt: "#45505C", hair: "#2B2B2B", skin: "#C48A60", accent: "#7A8B3F", accessory: "visor" }
-};
+const ACCESSORIES: Accessory[] = ["hardhat", "glasses", "hood", "beret", "headphones", "tie", "cap", "bun", "visor", "scarf"];
+export type Signature = "board" | "monitor" | "easel" | "server" | "checklist" | "screens" | "chart" | "camera" | "books" | "rack";
+const SIGNATURES: Signature[] = ["board", "monitor", "easel", "server", "checklist", "screens", "chart", "camera", "books", "rack"];
+const SHIRTS = ["#3F4A5A", "#4A5A3F", "#5B4A3A", "#6B7B83", "#2E2F33", "#7A5C46", "#C9A27A", "#556B5E", "#45505C", "#EADFCB"];
+const HAIRS = ["#1C1A17", "#2B1E16", "#3A2A1C", "#4A3826", "#5A3A22", "#7A3B1E", "#121212", "#8C8C88"];
+const SKINS = ["#F2D0B0", "#F0C9A4", "#EBC7A2", "#E8BE98", "#E2B48C", "#D6A47C", "#C98E64", "#C48A60", "#B57C55", "#9C6B48"];
+const ACCENTS = ["#B4410F", "#5B7F3A", "#A8452E", "#D49A1F", "#2F6F7A", "#4F5D75", "#3D6B8C", "#B85C38", "#6B5B95", "#7A8B3F"];
 
-export const lookOf = (id: string): Look =>
-  LOOKS[id] ?? { name: id, traits: [], short: id, shirt: "#777", hair: "#333", skin: "#D9A57E", accent: "#888", accessory: "cap" };
+// Hash FNV-1a: divisi tanpa persona tetap mendapat tampilan yang sama setiap kali dimuat.
+function hash(text: string, salt: string): number {
+  let h = 2166136261;
+  for (const ch of `${salt}:${text}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return h >>> 0;
+}
+const pick = <T,>(list: readonly T[], id: string, salt: string): T => list[hash(id, salt) % list.length];
+const oneOf = <T extends string>(list: readonly T[], v: string | undefined): T | undefined => (list.includes(v as T) ? (v as T) : undefined);
+
+export interface FullLook extends Look {
+  signature: Signature;
+  smallTalk: string[];
+}
+
+const cache = new Map<string, { src: unknown; look: FullLook }>();
+
+// Tampilan karakter dari `persona` di berkas divisi; bagian yang kosong diisi otomatis dari id.
+export function lookOf(id: string): FullLook {
+  const division = getDivisions().find((d) => d.id === id);
+  const hit = cache.get(id);
+  if (hit && hit.src === division) return hit.look;
+  const p = division?.persona ?? {};
+  const look: FullLook = {
+    name: p.name || division?.name || id,
+    traits: p.traits ?? [],
+    short: p.short || (division?.name ?? id).split(/[\s&-]+/)[0],
+    shirt: p.shirt || pick(SHIRTS, id, "shirt"),
+    hair: p.hair || pick(HAIRS, id, "hair"),
+    skin: p.skin || pick(SKINS, id, "skin"),
+    accent: p.accent || pick(ACCENTS, id, "accent"),
+    accessory: oneOf(ACCESSORIES, p.accessory) ?? pick(ACCESSORIES, id, "accessory"),
+    signature: oneOf(SIGNATURES, p.signature) ?? pick(SIGNATURES, id, "signature"),
+    smallTalk: p.smallTalk ?? []
+  };
+  cache.set(id, { src: division, look });
+  return look;
+}
+
+// Versi hook: komponen ikut digambar ulang saat persona divisi berubah di server.
+export function useLook(id: string): FullLook {
+  useDivisions();
+  return lookOf(id);
+}
+
+// Nama pendek divisi koordinator untuk teks panel (mis. "PM").
+export function useCoordinatorLabel(): string {
+  const id = useCoordinatorId();
+  return id ? lookOf(id).short : "Koordinator";
+}
 
 // Palet material kantor.
 export const MAT = {

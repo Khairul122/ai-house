@@ -174,19 +174,24 @@ export class OrchestratorService implements OnModuleInit {
 
   // ---------- perencanaan ----------
 
+  // Tugas perencanaan milik divisi koordinator (bukan tugas hasil rencana).
+  private isPlanTask(t: Pick<Task, "divisionId" | "title">) {
+    return t.title === PLAN_TASK_TITLE && t.divisionId === this.divisions.coordinatorId();
+  }
+
   async planProject(projectId: string) {
     const project = await this.mustProject(projectId);
     if (project.status !== "draft") throw new ConflictException("Rencana hanya bisa diminta untuk proyek berstatus draf.");
-    const pm = this.divisions.loadById("pm");
-    if (!pm) throw new ConflictException("Konfigurasi divisi PM tidak ditemukan.");
+    const pm = this.divisions.coordinator();
+    if (!pm) throw new ConflictException("Belum ada divisi koordinator. Tambahkan `role: coordinator` pada salah satu berkas house/divisions/*.md.");
 
     await this.setProjectStatus(project, "planning");
     const old = await db.query.tasks.findFirst({
-      where: and(eq(tasks.projectId, projectId), eq(tasks.divisionId, "pm"), eq(tasks.title, PLAN_TASK_TITLE))
+      where: and(eq(tasks.projectId, projectId), eq(tasks.divisionId, pm.id), eq(tasks.title, PLAN_TASK_TITLE))
     });
     const planTask = old
       ? await this.requeue(old)
-      : await this.insertTask(projectId, "pm", PLAN_TASK_TITLE, project.goal, "plan.json valid tersimpan di folder kerja");
+      : await this.insertTask(projectId, pm.id, PLAN_TASK_TITLE, project.goal, "plan.json valid tersimpan di folder kerja");
 
     const { finished } = await this.launch(planTask, this.planPrompt(project, pm));
     void finished.then((ok) => this.afterPlanning(projectId, planTask.id, ok));
@@ -196,7 +201,7 @@ export class OrchestratorService implements OnModuleInit {
   private planPrompt(project: Project, pm: DivisionEntity) {
     const ids = this.divisions
       .loadAll()
-      .filter((d) => d.id !== "pm")
+      .filter((d) => d.id !== pm.id)
       .map((d) => `- ${d.id}: ${d.description}`)
       .join("\n");
     return `${pm.prompt}
@@ -235,7 +240,7 @@ ${ids}`;
           if (parent) await db.insert(taskDependencies).values({ taskId: idByTitle.get(t.title)!, dependsOnId: parent });
         }
       }
-      await this.audit.record("pm", "project_planned", "project", projectId, { title: project.title, taskCount: plan.tasks.length });
+      await this.audit.record(this.divisions.coordinatorId() ?? "koordinator", "project_planned", "project", projectId, { title: project.title, taskCount: plan.tasks.length });
       if ((await getAutonomy()) === "auto") {
         await this.audit.record("otomatis", "plan_approved", "project", projectId, { title: project.title });
         await this.setProjectStatus(project, "in_progress");
@@ -245,7 +250,7 @@ ${ids}`;
       }
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
-      await this.finishTask(planTaskId, "failed", `Rencana PM tidak valid: ${reason}`.slice(0, 600));
+      await this.finishTask(planTaskId, "failed", `Rencana koordinator tidak valid: ${reason}`.slice(0, 600));
       await this.setProjectStatus(project, "draft");
     }
   }
@@ -262,7 +267,7 @@ ${ids}`;
   async rejectPlan(projectId: string) {
     const project = await this.mustProject(projectId);
     if (project.status !== "plan_review") throw new ConflictException("Tidak ada rencana yang menunggu persetujuan.");
-    const planned = (await this.taskService.listProjectTasks(projectId)).filter((t) => t.title !== PLAN_TASK_TITLE || t.divisionId !== "pm");
+    const planned = (await this.taskService.listProjectTasks(projectId)).filter((t) => !this.isPlanTask(t));
     if (planned.length) {
       const ids = planned.map((t) => t.id);
       await db.delete(taskDependencies).where(inArray(taskDependencies.taskId, ids));
@@ -288,7 +293,7 @@ ${ids}`;
       for (const t of ready) {
         if (this.live.size >= this.maxRuns) break;
         const division = this.divisions.loadById(t.divisionId);
-        this.eventBus.publish("task.dispatched", { taskId: t.id, from: "pm", to: t.divisionId, title: t.title });
+        this.eventBus.publish("task.dispatched", { taskId: t.id, from: this.divisions.coordinatorId(), to: t.divisionId, title: t.title });
         const { finished } = await this.launch(t, this.taskPrompt(t, division, project.workspacePath));
         void finished.then(() => this.tickAll());
       }
@@ -297,7 +302,7 @@ ${ids}`;
       const busy = [...this.live.values()].some((r) => r.projectId === project.id);
       if (busy || ready.length) continue;
       if (all.every((t) => t.status === "done")) {
-        await this.audit.record("pm", "project_completed", "project", project.id, { title: project.title });
+        await this.audit.record(this.divisions.coordinatorId() ?? "koordinator", "project_completed", "project", project.id, { title: project.title });
         await this.setProjectStatus(project, "completed");
       } else if (all.some((t) => t.status === "failed" || t.status === "cancelled")) {
         await this.setProjectStatus(project, "failed");
@@ -326,8 +331,8 @@ Baca berkas pendukung yang relevan di folder brief/ sebelum menyusun rencana. Bi
     if (clean.length < 3) throw new ConflictException("Tulis catatan revisi (minimal 3 karakter).");
     if (clean.length > 4000) throw new ConflictException("Catatan revisi terlalu panjang (maksimal 4000 karakter).");
     if (task.status === "running" || task.status === "queued") throw new ConflictException("Tugas ini masih antre atau berjalan. Tunggu selesai dulu.");
-    if (task.divisionId === "pm" && task.title === PLAN_TASK_TITLE) {
-      throw new ConflictException("Rencana PM tidak direvisi lewat sini. Buat proyek baru atau minta revisi pada tugas divisi.");
+    if (this.isPlanTask(task)) {
+      throw new ConflictException("Rencana koordinator tidak direvisi lewat sini. Buat proyek baru atau minta revisi pada tugas divisi.");
     }
     const project = await this.mustProject(task.projectId);
     if (project.status === "planning" || project.status === "plan_review") throw new ConflictException("Proyek sedang direncanakan. Tunggu rencananya selesai.");
@@ -394,7 +399,7 @@ Aturan saat bekerja di AI House:
         if (stalled && !cancelled && task.attempt < MAX_ATTEMPTS && (await getAutonomy()) === "auto") {
           const fresh = await db.query.tasks.findFirst({ where: eq(tasks.id, task.id) });
           if (fresh?.status === "failed") {
-            if (fresh.divisionId === "pm" && fresh.title === PLAN_TASK_TITLE) {
+            if (this.isPlanTask(fresh)) {
               await this.setProjectStatus(await this.mustProject(task.projectId), "draft");
               void this.planProject(task.projectId).catch(() => {});
             } else await this.requeue(fresh);
@@ -522,7 +527,7 @@ Aturan saat bekerja di AI House:
     if (task.status !== "failed" && task.status !== "cancelled") throw new ConflictException("Hanya tugas gagal atau dibatalkan yang bisa dicoba lagi.");
     const project = await this.mustProject(task.projectId);
 
-    if (task.divisionId === "pm" && task.title === PLAN_TASK_TITLE) {
+    if (this.isPlanTask(task)) {
       if (project.status !== "draft") await this.setProjectStatus(project, "draft");
       return this.planProject(project.id);
     }
