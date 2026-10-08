@@ -11,7 +11,7 @@ describe("workspaceFor", () => {
   it("proyek nyata ke WORKSPACES_DIR dengan nama folder yang terbaca", () => {
     process.env.WORKSPACES_DIR = "D:/real-aihouse";
     const dir = workspaceFor("01M4C41BFDAMDXTXMPHNBEMCZ3", "Landing page Kopi Senja!");
-    expect(dir).toBe(path.join(path.resolve("D:/real-aihouse"), "landing-page-kopi-senja-nbemcz3".replace("nbemcz3", "bemcz3")));
+    expect(dir).toBe(path.join(path.resolve("D:/real-aihouse"), "landing-page-kopi-senja-bemcz3"));
   });
 
   it("proyek demo tetap di folder internal", () => {

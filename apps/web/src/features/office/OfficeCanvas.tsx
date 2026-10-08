@@ -1,6 +1,7 @@
 import { CameraControls, Html } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
+import { Atmosphere } from "./Atmosphere.tsx";
 import { Campus } from "./Campus.tsx";
 import { Character } from "./Character.tsx";
 import { CORRIDOR_HALF, FLOOR_HALF_X, FLOOR_HALF_Z, ROOMS, roomById } from "./layout.ts";
@@ -113,18 +114,7 @@ export default function OfficeCanvas(props: OfficeProps) {
       gl={{ antialias: true, alpha: true }}
       aria-label="Kantor 3D AI House"
     >
-      <hemisphereLight args={["#FFF6E8", "#B8A890", 1.15]} />
-      <directionalLight
-        position={[30, 50, 20]}
-        intensity={1.7}
-        castShadow
-        shadow-mapSize={[4096, 4096]}
-        shadow-camera-left={-55}
-        shadow-camera-right={55}
-        shadow-camera-top={55}
-        shadow-camera-bottom={-55}
-        shadow-bias={-0.0005}
-      />
+      <Atmosphere />
 
       <Box p={[0, -0.05, 0]} s={[FLOOR_HALF_X * 2, 0.1, FLOOR_HALF_Z * 2]} c={MAT.concrete} shadow={false} />
       <Box p={[0, 0.005, 0]} s={[FLOOR_HALF_X * 2 - 1, 0.02, CORRIDOR_HALF * 2]} c={MAT.corridor} shadow={false} />

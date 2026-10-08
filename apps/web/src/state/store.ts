@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { fetchJson } from "../lib/api.ts";
+import { playEventSound } from "../lib/sound.ts";
 import { initialState, reduce, type OfficeEvent, type OfficeState, type SnapshotItem } from "./reduce.ts";
 
 let state: OfficeState = initialState;
@@ -28,6 +29,7 @@ export interface Division {
   name: string;
   description: string;
   model: string;
+  religion?: string;
   permission: { read: string; edit: string; bash: { allow: string[]; ask: string[]; deny: string[] } };
 }
 
@@ -71,7 +73,9 @@ export function useLiveOffice() {
     es.onerror = () => office.send({ type: "connection", payload: "offline" });
     es.onmessage = (m) => {
       try {
-        office.send(JSON.parse(m.data) as OfficeEvent);
+        const event = JSON.parse(m.data) as OfficeEvent;
+        office.send(event);
+        playEventSound(event);
       } catch {
         // abaikan pesan yang bukan JSON
       }

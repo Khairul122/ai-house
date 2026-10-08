@@ -1,8 +1,11 @@
 import { Html } from "@react-three/drei";
-import { useMemo } from "react";
-import { ExtrudeGeometry, Shape } from "three";
+import { useFrame } from "@react-three/fiber";
+import { useMemo, useRef } from "react";
+import { ExtrudeGeometry, type Mesh, type MeshStandardMaterial, Shape } from "three";
+import { atmo } from "./Atmosphere.tsx";
 import { CAMPUS_HALF_X, CAMPUS_HALF_Z, LEISURE, LIBRARY, PARK, PLAZA_Z, POOL, PROMENADE_Z, RING_X, WORSHIP, WORSHIP_Z } from "./layout.ts";
 import { MAT } from "./looks.ts";
+import { Monument } from "./Monument.tsx";
 import { Box, type V3 } from "./parts.tsx";
 
 const GRASS = "#A7B88A";
@@ -210,6 +213,88 @@ function Klenteng() {
   );
 }
 
+function Pew({ z }: { z: number }) {
+  return (
+    <group position={[0, 0, z]}>
+      <Box p={[0, 0.42, 0]} s={[2.8, 0.08, 0.45]} c={MAT.woodDark} />
+      <Box p={[0, 0.7, 0.25]} s={[2.8, 0.5, 0.07]} c={MAT.woodDark} />
+      {[-1.25, 1.25].map((x) => (
+        <Box key={x} p={[x, 0.2, 0]} s={[0.08, 0.4, 0.4]} c={MAT.woodDark} />
+      ))}
+    </group>
+  );
+}
+
+// Perlengkapan ibadah di depan bangunan; posisinya sama dengan WORSHIP_SPOTS.
+function WorshipFurniture({ id }: { id: (typeof WORSHIP)[number]["id"] }) {
+  switch (id) {
+    case "masjid":
+      return (
+        <group position={[0, 0.02, 5.25]}>
+          <Box p={[0, 0, 0]} s={[5.4, 0.04, 2.9]} c="#3E7C5E" shadow={false} />
+          {[-0.65, 0.65].map((z) => (
+            <Box key={z} p={[0, 0.025, z]} s={[5.4, 0.01, 0.06]} c="#C9B27A" shadow={false} />
+          ))}
+        </group>
+      );
+    case "gereja-protestan":
+      return (
+        <>
+          <Pew z={5.3} />
+          <Pew z={6.5} />
+        </>
+      );
+    case "gereja-katolik":
+      return (
+        <>
+          <Pew z={6.1} />
+          <Pew z={7.2} />
+        </>
+      );
+    case "klenteng":
+      return (
+        <group position={[0, 0, 4.6]}>
+          {[-0.3, 0.3].map((x) => (
+            <Box key={x} p={[x, 0.2, 0]} s={[0.1, 0.4, 0.1]} c="#5A4632" />
+          ))}
+          <mesh position={[0, 0.6, 0]} castShadow>
+            <cylinderGeometry args={[0.5, 0.38, 0.45, 16]} />
+            <meshStandardMaterial color="#8C6A2E" metalness={0.4} roughness={0.5} />
+          </mesh>
+          {[-0.15, 0, 0.15].map((x) => (
+            <Box key={x} p={[x, 1, 0]} s={[0.02, 0.4, 0.02]} c="#C8553D" emissive="#FF7A3A" glow={0.6} shadow={false} />
+          ))}
+        </group>
+      );
+    default:
+      return null;
+  }
+}
+
+// Lampu jalan: bohlam menyala sesuai atmo.lamp (malam atau hujan).
+function StreetLamp({ p }: { p: V3 }) {
+  const bulb = useRef<Mesh>(null);
+  useFrame(() => {
+    const m = bulb.current?.material as MeshStandardMaterial | undefined;
+    if (m) m.emissiveIntensity = atmo.lamp * 1.6;
+  });
+  return (
+    <group position={p}>
+      <Box p={[0, 1.3, 0]} s={[0.12, 2.6, 0.12]} c="#4A4E54" />
+      <Box p={[0, 2.66, 0]} s={[0.5, 0.12, 0.5]} c="#4A4E54" />
+      <mesh ref={bulb} position={[0, 2.52, 0]}>
+        <boxGeometry args={[0.32, 0.14, 0.32]} />
+        <meshStandardMaterial color="#FFF1CC" emissive="#FFC870" emissiveIntensity={0} />
+      </mesh>
+    </group>
+  );
+}
+
+const LAMPS: V3[] = [
+  ...[-36, -24, -12, 0, 12, 24, 36].map((x) => [x, 0, PROMENADE_Z - 1.3] as V3),
+  ...[-28, -14, 0, 14, 28].map((x) => [x, 0, PLAZA_Z + 1.3] as V3)
+];
+
 const BUILDINGS: Record<(typeof WORSHIP)[number]["id"], () => JSX.Element> = {
   masjid: Masjid,
   "gereja-protestan": GerejaProtestan,
@@ -221,11 +306,17 @@ const BUILDINGS: Record<(typeof WORSHIP)[number]["id"], () => JSX.Element> = {
 
 function Pool() {
   const { x, z, w, d } = POOL;
+  const water = useRef<Mesh>(null);
+  // kilau air pelan; ikut lebih gelap saat malam
+  useFrame(({ clock }) => {
+    const m = water.current?.material as MeshStandardMaterial | undefined;
+    if (m) m.emissiveIntensity = 0.18 + Math.sin(clock.elapsedTime * 1.3) * 0.06 + atmo.lamp * 0.25;
+  });
   const loungers = LEISURE.filter((l) => l.key.startsWith("kursi-kolam"));
   return (
     <group>
       <Box p={[x, 0.05, z]} s={[w + 4, 0.1, d + 4]} c="#E4DCCB" shadow={false} />
-      <mesh position={[x, 0.13, z]} receiveShadow>
+      <mesh ref={water} position={[x, 0.13, z]} receiveShadow>
         <boxGeometry args={[w, 0.04, d]} />
         <meshStandardMaterial color="#5FA8C9" emissive="#2C6E8E" emissiveIntensity={0.25} roughness={0.15} />
       </mesh>
@@ -301,6 +392,10 @@ function Library() {
 
 function Park() {
   const { x, z } = PARK;
+  const jet = useRef<Mesh>(null);
+  useFrame(({ clock }) => {
+    if (jet.current) jet.current.scale.y = 0.85 + Math.sin(clock.elapsedTime * 3) * 0.15;
+  });
   return (
     <group position={[x, 0, z]}>
       <mesh position={[0, 0.25, 0]} castShadow receiveShadow>
@@ -318,6 +413,10 @@ function Park() {
       <mesh position={[0, 1.55, 0]}>
         <cylinderGeometry args={[0.55, 0.25, 0.2, 14]} />
         <meshStandardMaterial color="#B8AE9C" />
+      </mesh>
+      <mesh ref={jet} position={[0, 1.9, 0]}>
+        <cylinderGeometry args={[0.06, 0.12, 0.7, 8]} />
+        <meshStandardMaterial color="#BFE3F2" transparent opacity={0.7} />
       </mesh>
       {/* bangku menghadap air mancur */}
       <Box p={[-3.9, 0.36, 0]} s={[0.5, 0.12, 1.4]} c={MAT.wood} />
@@ -338,10 +437,10 @@ function Park() {
 
 const TREES: [number, number, number][] = [
   [-42, -28, 1.2], [-30, -28, 1], [-14, -29, 1.1], [0, -28, 1.3], [14, -29, 1], [28, -28, 1.2], [42, -27, 1.1],
-  [-43, -8, 1.2], [-43, 6, 1], [-43, 22, 1.3], [43, -8, 1.1], [43, 6, 1.2], [43, 24, 1],
+  [-43, -8, 1.2], [-43, 6, 1], [-43, 22, 1.3], [43, -8, 1.1], [43, 6, 1.2], 
   [-33, 27, 1.1], [-10, 28, 1], [12, 28, 1.2], [33, 28, 1.1],
   [-28, -6, 0.9], [-28, 4, 1], [28, -6, 1], [28, 4, 0.9],
-  [30, 14, 1], [20, 24, 1.1], [-10, 14, 0.9], [12, 14, 1]
+  [30, 14, 1], [20, 24, 1.1], [-10, 14, 0.9], [12, 14, 1], [33, 21, 0.9], [42, 30, 1]
 ];
 
 export function Campus() {
@@ -369,7 +468,8 @@ export function Campus() {
         return (
           <group key={b.id} position={[b.x, 0, WORSHIP_Z]}>
             <Building />
-            <Sign p={[0, 0.9, 5]} text={b.name} />
+            <WorshipFurniture id={b.id} />
+            <Sign p={[0, 0.9, 7.6]} text={b.name} />
           </group>
         );
       })}
@@ -377,6 +477,11 @@ export function Campus() {
       <Pool />
       <Library />
       <Park />
+      {/* tugu di pojok tenggara kampus, menghadap arah kamera bawaan */}
+      <Monument position={[38, 0, 25]} rotation={Math.PI / 4} />
+      {LAMPS.map((p) => (
+        <StreetLamp key={`${p[0]}${p[2]}`} p={p} />
+      ))}
       {TREES.map(([x, z, s]) => (
         <Tree key={`${x}${z}`} p={[x, 0, z]} s={s} />
       ))}

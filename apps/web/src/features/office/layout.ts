@@ -135,3 +135,29 @@ export const SMALL_TALK: Record<string, string[]> = {
   "research-content": ["Aku baca riset baru.", "Sumbernya valid kok.", "Pesaing rilis fitur baru."],
   "infrastructure-network": ["Jaringannya kencang.", "Ping-nya rendah hari ini.", "Kabelnya sudah dirapikan."]
 };
+
+// ---------- Tempat ibadah: posisi jamaah di depan tiap bangunan ----------
+export type WorshipStyle = "salat" | "doa-duduk" | "doa-katolik" | "sembah" | "meditasi" | "dupa";
+
+export interface WorshipSpot {
+  key: string;
+  at: Vec2;
+  face: number;
+  style: WorshipStyle;
+  building: (typeof WORSHIP)[number]["id"];
+}
+
+// Arah kiblat dari Indonesia kira-kira barat-barat laut (~295°). Di kampus, -x = barat, -z = utara.
+export const QIBLA = Math.atan2(-0.906, -0.423);
+const bx = (id: (typeof WORSHIP)[number]["id"]) => WORSHIP.find((w) => w.id === id)!.x;
+const spot = (building: WorshipSpot["building"], style: WorshipStyle, face: number, list: Vec2[]): WorshipSpot[] =>
+  list.map(([x, z], i) => ({ key: `${building}-${i}`, at: [bx(building) + x, WORSHIP_Z + z], face, style, building }));
+
+export const WORSHIP_SPOTS: Record<string, WorshipSpot[]> = {
+  islam: spot("masjid", "salat", QIBLA, [[-1.6, 4.6], [0, 4.6], [1.6, 4.6], [-0.8, 5.9], [0.8, 5.9]]),
+  protestan: spot("gereja-protestan", "doa-duduk", Math.PI, [[-1, 5.3], [1, 5.3], [0, 6.5]]),
+  katolik: spot("gereja-katolik", "doa-katolik", Math.PI, [[-1, 6.1], [1, 6.1], [0, 7.2]]),
+  hindu: spot("pura", "sembah", Math.PI, [[-0.8, 5.4], [0.8, 5.4]]),
+  buddha: spot("vihara", "meditasi", Math.PI, [[-0.8, 5.2], [0.8, 5.2]]),
+  konghucu: spot("klenteng", "dupa", Math.PI, [[-0.6, 5.7], [0.6, 5.7]])
+};

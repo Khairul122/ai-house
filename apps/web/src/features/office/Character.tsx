@@ -1,9 +1,11 @@
 import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
-import type { Group } from "three";
+import { type Camera, type Group, type OrthographicCamera, Vector3 } from "three";
 import type { AgentStatus, Dispatch } from "../../state/reduce.ts";
-import { office } from "../../state/store.ts";
+import { play, type SoundName } from "../../lib/sound.ts";
+import { env } from "../../state/env.ts";
+import { office, useDivisions } from "../../state/store.ts";
 import { useAgentStatus } from "../../state/useAgentStatus.ts";
 import {
   type Act,
@@ -17,8 +19,12 @@ import {
   SMALL_TALK,
   standOf,
   toCorridor,
-  type Vec2
+  type Vec2,
+  WORSHIP_SPOTS,
+  type WorshipStyle
 } from "./layout.ts";
+import { atmo } from "./Atmosphere.tsx";
+import { type Religion, worshipUntil } from "./environment.ts";
 import { type Accessory, lookOf, MAT } from "./looks.ts";
 import { Box } from "./parts.tsx";
 import { claim, leaveMeet, markArrived, meetOf, placeIn, proposeChat, releaseAll, setAvailable, turnOf } from "./social.ts";
@@ -36,8 +42,28 @@ interface Goal {
   at: Vec2;
   pose: Pose;
   face?: number;
-  act?: Act | "chat";
+  act?: Act | "chat" | "worship";
+  style?: WorshipStyle;
 }
+
+const v3 = new Vector3();
+// Seberapa keras suara karakter terdengar: hanya bila tampak di layar dan kamera cukup dekat.
+function audibility(camera: Camera, x: number, z: number) {
+  v3.set(x, 1, z).project(camera);
+  if (Math.abs(v3.x) > 1.05 || Math.abs(v3.y) > 1.05) return 0;
+  return Math.min(1, Math.max(0, ((camera as OrthographicCamera).zoom - 12) / 35));
+}
+
+// Satu bunyi pembuka per tempat ibadah per sesi, bukan satu per jamaah.
+const buildingRang = new Map<string, number>();
+const BUILDING_SOUND: Record<string, SoundName | null> = {
+  masjid: null, // tanpa tiruan azan, demi hormat
+  "gereja-protestan": "bell",
+  "gereja-katolik": "bell",
+  pura: "chime",
+  vihara: "gong",
+  klenteng: "gong"
+};
 
 const angleTo = (from: Vec2, to: Vec2) => Math.atan2(to[0] - from[0], to[1] - from[1]);
 const inPool = (x: number, z: number) => Math.abs(x - POOL.x) < POOL.w / 2 && Math.abs(z - POOL.z) < POOL.d / 2;
@@ -120,6 +146,9 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
   const bang = useRef<Group>(null);
   const talk = useRef<HTMLDivElement>(null);
   const talkAnchor = useRef<Group>(null);
+  const umbrella = useRef<Group>(null);
+  const incense = useRef<Group>(null);
+  const religion = useDivisions().find((d) => d.id === id)?.religion as Religion | undefined;
 
   const seat = seatOf(room);
   const faceDesk = angleTo(seat, deskOf(room));
@@ -135,6 +164,13 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       count: 0,
       lastStatus: "idle" as AgentStatus,
       chatting: false,
+      worshipCheckAt: 0,
+      worshipEnd: null as number | null,
+      worshipKey: "",
+      rang: "",
+      nextSound: 0,
+      lastTurn: -1,
+      sipping: false,
       carrying: null as Dispatch | null,
       handoverAt: 0
     }),
@@ -153,14 +189,29 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     if (r < 0.16) return sitGoal(n);
     if (r < 0.26) return { key: n, zone: id, at: randomInRoom(room), pose: "stand" };
     if (r < 0.42 && proposeChat(id, [brain.x, brain.z], now)) return brain.goal; // obrolan diambil alih oleh meetOf
-    for (const spot of shuffle(LEISURE)) {
+    // hujan: tetap di dalam gedung; dingin: tidak berenang; panas: kolam ramai; malam: lebih banyak tidur
+    const w = atmo.weather;
+    const night = atmo.phase === "malam";
+    const options = LEISURE.filter((l) => {
+      if (w === "hujan" && zoneAt(l.at[0], l.at[1]) === "outside") return false;
+      if (w === "dingin" && (l.act === "swim" || l.key.startsWith("kursi-kolam"))) return false;
+      if (night && l.act === "swim") return false;
+      return true;
+    }).flatMap((l) => {
+      let weight = 1;
+      if (w === "panas" && l.act === "swim") weight = 4;
+      if (w === "dingin" && l.act === "coffee") weight = 3;
+      if (night && l.act === "sleep") weight = 3;
+      return Array<typeof l>(weight).fill(l);
+    });
+    for (const spot of shuffle(options)) {
       if (!claim(spot.key, id)) continue;
       return { key: `${n}-${spot.key}`, zone: zoneAt(spot.at[0], spot.at[1]), at: spot.at, pose: spot.pose, face: spot.face, act: spot.act };
     }
     return { key: n, zone: id, at: randomInRoom(room), pose: "stand" };
   };
 
-  useFrame(({ clock }, delta) => {
+  useFrame(({ clock, camera }, delta) => {
     const g = root.current;
     if (!g) return;
     const now = Date.now();
@@ -189,7 +240,14 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       leaveMeet(id);
       releaseAll(id);
     }
-    const meet = status === "idle" && !brain.carrying ? meetOf(id, now) : undefined;
+    // jadwal ibadah memakai jam simulasi/nyata; dicek sekali per detik
+    if (now > brain.worshipCheckAt) {
+      brain.worshipCheckAt = now + 1000;
+      brain.worshipEnd = worshipUntil(religion, env.now());
+    }
+    const worshipping = status === "idle" && !brain.carrying && brain.worshipEnd !== null && !!religion;
+    if (worshipping) leaveMeet(id);
+    const meet = status === "idle" && !brain.carrying && !worshipping ? meetOf(id, now) : undefined;
     if (brain.carrying) {
       const target = roomById(brain.carrying.to);
       goal = target
@@ -200,11 +258,24 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     else if (status === "waiting") {
       goal = { key: "wait", zone: id, at: standOf(room), pose: "stand", face: toCorridor(room) > 0 ? 0 : Math.PI };
     } else if (status === "done") goal = { ...brain.goal, pose: brain.goal.pose === "sit" ? "sit" : "stand", act: undefined };
-    else if (meet) {
+    else if (worshipping && religion) {
+      const spots = WORSHIP_SPOTS[religion];
+      if (!brain.worshipKey) {
+        releaseAll(id);
+        brain.worshipKey = (spots.find((w) => claim(w.key, id)) ?? spots[0]).key;
+        brain.rang = "";
+      }
+      const w = spots.find((x) => x.key === brain.worshipKey) ?? spots[0];
+      goal = { key: `ibadah-${w.key}`, zone: "outside", at: w.at, pose: "stand", face: w.face, act: "worship", style: w.style };
+    } else if (meet) {
       const place = placeIn(meet, id);
       goal = { key: meet.key, zone: meet.zone, at: place.at, pose: "stand", face: place.face, act: "chat" };
       brain.chatting = true;
     } else {
+      if (brain.worshipKey) {
+        brain.worshipKey = "";
+        brain.nextIdle = 0; // ibadah selesai: lanjut kegiatan lain
+      }
       if (brain.chatting) {
         brain.chatting = false;
         brain.nextIdle = 0; // obrolan selesai: cari kegiatan baru
@@ -268,7 +339,73 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     let tiltX = 0;
     let lift = 0;
 
-    if (pose === "swim") {
+    const outside = zoneAt(brain.x, brain.z) === "outside";
+    if (act === "worship") {
+      const style = goal.style;
+      const c = (t + id.length * 1.7) % 20; // tiap jamaah sedikit berbeda irama
+      const kneel = () => {
+        lift = -0.22;
+        lx = rx = 1.4;
+      };
+      const ground = () => {
+        lift = -0.32;
+        lx = rx = -1.5;
+      };
+      if (style === "salat") {
+        const step = c % 16;
+        if (step < 4) {
+          al = ar = -1.15; // berdiri, tangan bersedekap
+          alz = 0.55;
+          arz = -0.55;
+        } else if (step < 7) {
+          bx = 1.35; // rukuk
+          al = ar = -0.35;
+          hx = -0.2;
+        } else if (step < 9) {
+          // iktidal: berdiri tegak
+        } else if (step < 12 || step >= 14) {
+          kneel(); // sujud
+          bx = 1.45;
+          al = ar = -1.3;
+          hx = 0.3;
+        } else {
+          kneel(); // duduk di antara dua sujud
+          al = ar = -0.5;
+        }
+      } else if (style === "doa-duduk" || (style === "doa-katolik" && c < 12)) {
+        lx = rx = -Math.PI / 2; // duduk di bangku, tangan terkatup, kepala tertunduk
+        al = ar = -1.0;
+        alz = 0.45;
+        arz = -0.45;
+        hx = 0.35;
+      } else if (style === "doa-katolik") {
+        kneel(); // berlutut
+        al = ar = -1.3;
+        alz = 0.45;
+        arz = -0.45;
+        hx = 0.25;
+      } else if (style === "sembah") {
+        ground(); // duduk bersila, tangan terkatup di atas kepala
+        const down = c % 6 > 4;
+        al = ar = down ? -1.2 : -2.75;
+        alz = 0.35;
+        arz = -0.35;
+        hx = down ? 0.2 : -0.1;
+      } else if (style === "meditasi") {
+        ground(); // bersila, tangan di pangkuan, sesekali bersujud
+        al = ar = -0.6;
+        alz = 0.5;
+        arz = -0.5;
+        bx = c % 10 > 8 ? 0.9 : 0;
+        hx = 0.15;
+      } else if (style === "dupa") {
+        al = ar = -1.2; // memegang dupa di depan dada, membungkuk tiga kali
+        alz = 0.5;
+        arz = -0.5;
+        const b = c % 8;
+        bx = (b > 2 && b < 3) || (b > 4 && b < 5) || (b > 6 && b < 7) ? 0.6 : 0;
+      }
+    } else if (pose === "swim") {
       tiltX = Math.PI / 2;
       lift = 0.12;
       lx = Math.sin(t * 10) * 0.35;
@@ -335,7 +472,17 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     } else if (act === "read") {
       al = ar = -1.0;
       hx = 0.3;
+    } else if (atmo.weather === "panas" && outside && !moving) {
+      al = -1.9 + Math.sin(t * 9) * 0.25; // mengipas karena gerah
+      alz = 0.6;
+    } else if (atmo.weather === "dingin" && !moving && pose === "stand") {
+      al = ar = -1.35; // bersedekap menahan dingin
+      alz = 0.9;
+      arz = -0.9;
     }
+    // payung saat hujan di luar gedung, kecuali berbaring, berenang, atau beribadah
+    const umbrellaOn = outside && atmo.rain > 0.4 && pose !== "lie" && pose !== "swim" && act !== "worship";
+    if (umbrellaOn) ar = -2.0;
     if (brain.carrying && status !== "waiting") ar = moving ? -0.6 : -1.0;
 
     const k = Math.min(1, dt * 10);
@@ -369,6 +516,41 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     if (folder.current) folder.current.visible = !!brain.carrying;
     if (book.current) book.current.visible = act === "read" && !brain.carrying;
     if (cup.current) cup.current.visible = act === "coffee" && !brain.carrying;
+    if (umbrella.current) umbrella.current.visible = umbrellaOn;
+    if (incense.current) incense.current.visible = act === "worship" && goal.style === "dupa";
+
+    // suara interaksi, hanya bila karakter terlihat dan kamera cukup dekat
+    const vol = audibility(camera, brain.x, brain.z);
+    if (vol > 0) {
+      if (act === "worship" && brain.rang !== goal.key) {
+        brain.rang = goal.key;
+        const w = religion ? WORSHIP_SPOTS[religion].find((x) => x.key === brain.worshipKey) : undefined;
+        const sound = w ? BUILDING_SOUND[w.building] : null;
+        if (w && sound && now - (buildingRang.get(w.building) ?? 0) > 60_000) {
+          buildingRang.set(w.building, now);
+          play(sound, vol);
+        }
+      }
+      if (act === "chat" && meet) {
+        const turn = turnOf(meet, now);
+        if (turn && turn.turn !== brain.lastTurn) {
+          brain.lastTurn = turn.turn;
+          if (turn.speaker === id) play("chat", vol);
+        }
+      }
+      if (act === "coffee") {
+        const sipping = ar < -1.8;
+        if (sipping && !brain.sipping) play("sip", vol);
+        brain.sipping = sipping;
+      }
+      if (now > brain.nextSound) {
+        if (status === "working" && !moving) play("type", vol * 0.6);
+        else if (pose === "swim") play("splash", vol);
+        else if (act === "sleep" && pose === "lie") play("snore", vol);
+        else if (act === "read" && !moving) play("page", vol * 0.8);
+        brain.nextSound = now + (status === "working" ? 1400 : pose === "swim" ? 2400 : act === "sleep" ? 4500 : 7000) + Math.random() * 900;
+      }
+    }
     if (bang.current && agent) {
       const fresh = now - agent.changedAt < 3000; // memantul sebentar saat baru muncul, lalu diam
       bang.current.position.y = 1.78 + (fresh && !reducedMotion ? Math.abs(Math.sin(now / 140)) * 0.12 : 0);
@@ -423,6 +605,14 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
                   <group ref={cup} visible={false}>
                     <Box p={[0, -0.5, 0.08]} s={[0.1, 0.13, 0.1]} c="#F4EEDF" />
                   </group>
+                  <group ref={incense} visible={false}>
+                    {[-0.04, 0, 0.04].map((x) => (
+                      <Box key={x} p={[x, -0.5, 0.25]} s={[0.015, 0.015, 0.4]} c="#C8553D" shadow={false} />
+                    ))}
+                    {[-0.04, 0, 0.04].map((x) => (
+                      <Box key={`ujung${x}`} p={[x, -0.5, 0.46]} s={[0.025, 0.025, 0.03]} c="#FF8A4A" emissive="#FF6A2A" glow={1} shadow={false} />
+                    ))}
+                  </group>
                   <group ref={book} visible={false}>
                     <Box p={[-0.3, -0.5, 0.06]} s={[0.42, 0.06, 0.3]} c={look.accent} rotation={[0.5, 0, 0]} />
                   </group>
@@ -444,6 +634,14 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
             <HeadGear kind={look.accessory} accent={look.accent} hair={look.hair} shirt={look.shirt} />
           </group>
         </group>
+      </group>
+
+      <group ref={umbrella} visible={false} position={[0.3, 0, 0]}>
+        <Box p={[0, 1.55, 0]} s={[0.04, 1.1, 0.04]} c="#3A3530" shadow={false} />
+        <mesh position={[0, 2.12, 0]} castShadow>
+          <coneGeometry args={[0.75, 0.32, 8]} />
+          <meshStandardMaterial color={look.accent} roughness={0.7} />
+        </mesh>
       </group>
 
       {status === "waiting" && (
