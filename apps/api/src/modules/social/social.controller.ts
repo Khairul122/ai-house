@@ -21,6 +21,16 @@ export class SocialController {
     return this.social.addAccount(body);
   }
 
+  @Post("connect/tiktok/start")
+  tiktokStart(@Body() body: unknown) {
+    return this.social.tiktokConnectStart(body);
+  }
+
+  @Post("connect/tiktok/finish")
+  tiktokFinish(@Body() body: { redirected?: string }) {
+    return this.social.tiktokConnectFinish(body ?? {});
+  }
+
   @Delete("accounts/:id")
   removeAccount(@Param("id") id: string) {
     return this.social.removeAccount(id);

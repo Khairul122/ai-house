@@ -79,6 +79,137 @@ const send = (url: string, method: string, body?: unknown) =>
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
+// Hubungkan TikTok tanpa menyalin token: buat tautan izin, setujui di TikTok, tempel alamat hasil pengalihan.
+function TikTokConnect({ onDone }: { onDone: () => void }) {
+  const [form, setForm] = useState({
+    clientKey: "",
+    clientSecret: "",
+    redirectUri: "",
+    id: "tiktok-utama",
+    label: "TikTok AI House",
+    handle: "",
+  });
+  const [link, setLink] = useState<string | null>(null);
+  const [pasted, setPasted] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+  const set =
+    (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const start = (e: React.FormEvent) => {
+    e.preventDefault();
+    void run(async () => {
+      const r = await postJson<{ url: string }>("/api/social/connect/tiktok/start", form);
+      setLink(r.url);
+      // rahasia sudah dipegang server (hanya di memori); hapus dari layar
+      setForm((f) => ({ ...f, clientSecret: "" }));
+    });
+  };
+
+  const finish = () =>
+    void run(async () => {
+      const r = await postJson<{ scope: string }>("/api/social/connect/tiktok/finish", { redirected: pasted });
+      setLink(null);
+      setPasted("");
+      setOkMsg(
+        r.scope.includes("video.upload")
+          ? "TikTok terhubung. Izin video.upload aktif."
+          : `TikTok terhubung, tetapi izin yang diberikan: ${r.scope || "(kosong)"}. Pastikan video.upload dan video.publish aktif di portal.`,
+      );
+      onDone();
+    });
+
+  return (
+    <details className="form-group">
+      <summary className="text-sm font-semibold text-ink cursor-pointer">
+        Hubungkan TikTok (otomatis)
+      </summary>
+      {okMsg && <p className="text-sm text-ok mt-2">{okMsg}</p>}
+      {!link ? (
+        <form onSubmit={start} className="space-y-3 mt-2" noValidate autoComplete="off">
+          <p className="text-xs text-ink-muted">
+            Isi Client key dan secret dari portal TikTok. Redirect URI harus <strong>sama persis</strong>
+            dengan yang didaftarkan di portal. Secret hanya ditahan di memori server selama 10 menit.
+          </p>
+          <label className="field">
+            <span>Client key *</span>
+            <input value={form.clientKey} onChange={set("clientKey")} autoComplete="off" />
+          </label>
+          <label className="field">
+            <span>Client secret *</span>
+            <input type="password" value={form.clientSecret} onChange={set("clientSecret")} autoComplete="off" />
+          </label>
+          <label className="field">
+            <span>Redirect URI *</span>
+            <input value={form.redirectUri} onChange={set("redirectUri")} placeholder="https://..." />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="field">
+              <span>ID akun *</span>
+              <input value={form.id} onChange={set("id")} maxLength={40} />
+            </label>
+            <label className="field">
+              <span>Nama *</span>
+              <input value={form.label} onChange={set("label")} maxLength={80} />
+            </label>
+          </div>
+          <label className="field">
+            <span>Username</span>
+            <input value={form.handle} onChange={set("handle")} placeholder="@namaakun" />
+          </label>
+          {error && <ErrorNote>{error}</ErrorNote>}
+          <button type="submit" className="btn btn-primary" disabled={busy || !form.clientKey || !form.clientSecret || !form.redirectUri}>
+            {busy ? "Menyiapkan…" : "Buat tautan izin"}
+          </button>
+        </form>
+      ) : (
+        <div className="space-y-3 mt-2">
+          <ol className="list-decimal pl-5 text-sm text-ink space-y-1">
+            <li>
+              Buka{" "}
+              <a href={link} target="_blank" rel="noreferrer" className="underline">
+                tautan izin TikTok
+              </a>{" "}
+              dan setujui. Login sebagai akun yang akan dipakai memposting.
+            </li>
+            <li>
+              Browser dialihkan ke Redirect URI Anda. Halamannya boleh error atau kosong; yang dibutuhkan hanya alamatnya.
+            </li>
+            <li>Salin <strong>seluruh alamat</strong> dari address bar (berisi code= dan state=), tempel di bawah.</li>
+          </ol>
+          <label className="field">
+            <span>Alamat hasil pengalihan</span>
+            <textarea value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} placeholder="https://...?code=...&state=..." />
+          </label>
+          {error && <ErrorNote>{error}</ErrorNote>}
+          <div className="flex gap-2">
+            <button type="button" className="btn btn-primary" onClick={finish} disabled={busy || !pasted.trim()}>
+              {busy ? "Menukar kode…" : "Selesaikan"}
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={() => { setLink(null); setError(null); }}>
+              Mulai lagi
+            </button>
+          </div>
+        </div>
+      )}
+    </details>
+  );
+}
+
 function AccountForm({
   platforms,
   onDone,
@@ -645,7 +776,10 @@ export function SocialPanel() {
         ))}
       </ul>
       {platforms.data && (
-        <AccountForm platforms={platforms.data} onDone={reload} />
+        <div className="space-y-2">
+          <TikTokConnect onDone={reload} />
+          <AccountForm platforms={platforms.data} onDone={reload} />
+        </div>
       )}
 
       <h3 className="text-sm font-semibold text-ink mt-5 mb-1">

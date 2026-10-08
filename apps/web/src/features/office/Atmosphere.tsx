@@ -2,9 +2,14 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import { Color, type DirectionalLight, FogExp2, type HemisphereLight, type InstancedMesh, type Mesh, type OrthographicCamera, Object3D, type PointLight, MeshStandardMaterial, ShaderMaterial, Vector3 } from "three";
 import { play, setRain } from "../../lib/sound.ts";
+import { camera as view } from "../../state/camera.ts";
 import { env, useEnv } from "../../state/env.ts";
+import { useFloors } from "../../state/store.ts";
 import { lightingFor, type Phase, type Weather } from "./environment.ts";
-import { CAMPUS_HALF_X, CAMPUS_HALF_Z } from "./layout.ts";
+import { CAMPUS_HALF_X, CAMPUS_HALF_Z, FLOOR_H } from "./layout.ts";
+
+// Lampu koridor tiap lantai (x), menyala malam atau saat hujan.
+const LAMP_X = [-10, 0, 10, 15.5];
 
 // Keadaan suasana yang dibaca komponen lain setiap frame (lampu, karakter).
 export const atmo = { lamp: 0, rain: 0, weather: "cerah" as Weather, phase: "siang" as Phase };
@@ -140,6 +145,8 @@ export function Atmosphere() {
   const target = useMemo(() => ({ sky: new Color(), sun: new Color(), hs: new Color(), hg: new Color(), pos: new Vector3() }), []);
   const nextAmbient = useRef(0);
   const sound = useEnv((s) => s.sound);
+  const levels = Math.max(1, useFloors().length);
+  night.current.length = levels * LAMP_X.length;
 
   useEffect(() => {
     // bayangan dihitung ulang tiap 2 frame, bukan tiap frame: hampir tak terlihat bedanya, separuh biayanya
@@ -183,7 +190,11 @@ export function Atmosphere() {
     }
     atmo.lamp += ((l.lamps ? 1 : 0) - atmo.lamp) * k;
     atmo.rain += ((weather === "hujan" ? 1 : 0) - atmo.rain) * k;
-    for (const p of night.current) if (p) p.intensity = atmo.lamp * 14;
+    // lantai di atas lantai yang dilihat disembunyikan, lampunya ikut padam agar tidak menyinari dari atas
+    const top = view.get().floor ?? Number.POSITIVE_INFINITY;
+    night.current.forEach((p, i) => {
+      if (p) p.intensity = Math.floor(i / LAMP_X.length) > top ? 0 : atmo.lamp * 14;
+    });
 
     // suara sekitar: hujan terus-menerus, burung siang hari, jangkrik malam hari
     setRain(sound && weather === "hujan");
@@ -211,20 +222,22 @@ export function Atmosphere() {
         shadow-camera-bottom={-55}
         shadow-bias={-0.0005}
       />
-      {/* lampu koridor dan ruang santai yang hanya menyala malam/hujan */}
-      {[-10, 0, 10, 15.5].map((x, i) => (
-        <pointLight
-          key={x}
-          ref={(p) => {
-            if (p) night.current[i] = p;
-          }}
-          position={[x, 2.4, 0]}
-          color="#FFD9A0"
-          intensity={0}
-          distance={9}
-          decay={1.6}
-        />
-      ))}
+      {/* lampu koridor dan ruang santai tiap lantai yang hanya menyala malam/hujan */}
+      {Array.from({ length: levels }, (_, level) =>
+        LAMP_X.map((x, i) => (
+          <pointLight
+            key={`${level}-${x}`}
+            ref={(p) => {
+              if (p) night.current[level * LAMP_X.length + i] = p;
+            }}
+            position={[x, level * FLOOR_H + 2.4, 0]}
+            color="#FFD9A0"
+            intensity={0}
+            distance={9}
+            decay={1.6}
+          />
+        ))
+      )}
       <Sky />
       <Rain />
       <Clouds />

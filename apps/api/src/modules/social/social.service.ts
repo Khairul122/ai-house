@@ -8,6 +8,7 @@ import { db } from "../../db/index.js";
 import { projects, socialAccounts, socialPosts, tasks } from "../../db/schema/index.js";
 import { AuditService } from "../audit/audit.service.js";
 import { EventBusService } from "../events/event-bus.service.js";
+import { tiktokFinish, tiktokStart } from "./oauth.js";
 import { type Media, mimeOf, PLATFORMS } from "./platforms.js";
 
 const MAX_MEDIA_BYTES = 1024 * 1024 * 1024; // 1 GB per berkas
@@ -20,6 +21,15 @@ export const AccountInputSchema = z.object({
   label: z.string().trim().min(1, "Nama akun wajib diisi.").max(80),
   handle: z.string().trim().max(80).optional(),
   secrets: z.record(z.string().max(4000)).default({})
+});
+
+export const TikTokConnectSchema = z.object({
+  clientKey: z.string().trim().min(3, "Isi Client key.").max(100),
+  clientSecret: z.string().trim().min(8, "Isi Client secret.").max(200),
+  redirectUri: z.string().trim().url("Redirect URI harus berupa alamat lengkap (https://...).").max(500),
+  id: AccountInputSchema.shape.id,
+  label: AccountInputSchema.shape.label,
+  handle: z.string().trim().max(80).optional()
 });
 
 // Berkas pengajuan dari agen: publikasi/<nama>.json. "akun" boleh satu id atau daftar id (multi-platform);
@@ -92,6 +102,26 @@ export class SocialService implements OnModuleInit {
     await this.audit.record("owner", "social_account_added", "social_account", input.id, { platform: input.platform, label: input.label });
     this.changed();
     return { ok: true };
+  }
+
+  // Hubungkan TikTok: langkah 1 membuat tautan izin; langkah 2 menukar kode dari alamat pengalihan menjadi token.
+  async tiktokConnectStart(body: unknown) {
+    const parsed = TikTokConnectSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0]?.message ?? "Isian tidak valid.");
+    if (await db.query.socialAccounts.findFirst({ where: eq(socialAccounts.id, parsed.data.id) })) throw new ConflictException(`ID akun ${parsed.data.id} sudah dipakai.`);
+    return tiktokStart(parsed.data);
+  }
+
+  async tiktokConnectFinish(body: { redirected?: string }) {
+    const { pending, tokens } = await tiktokFinish(String(body?.redirected ?? ""));
+    await this.addAccount({
+      id: pending.id,
+      platform: "tiktok",
+      label: pending.label,
+      handle: pending.handle,
+      secrets: { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, clientKey: pending.clientKey, clientSecret: pending.clientSecret, privacy: "SELF_ONLY", mode: "inbox" }
+    });
+    return { ok: true, id: pending.id, scope: tokens.scope };
   }
 
   async removeAccount(id: string) {
