@@ -210,3 +210,12 @@ a:focus-visible, button:focus-visible, .panel:focus-visible { outline: 2px solid
   box-shadow: 0 8px 28px rgb(0 0 0 / 0.12);
 }
 .field select { width: 100%; font-size: 0.875rem; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; }
+
+/* Kelompok isian formulir proyek */
+.form-group { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+.form-group > legend { font-size: 0.75rem; font-weight: 700; color: var(--ink); padding: 0 4px; }
+.field input[type="file"] { padding: 4px; }
+
+/* Baris aksi di bawah tugas: tautan dan tombol sejajar dengan jarak yang jelas */
+.task-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 8px; }
+.btn-sm { font-size: 0.75rem; padding: 3px 10px; min-height: 28px; border-radius: 4px; }

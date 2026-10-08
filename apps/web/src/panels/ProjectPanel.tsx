@@ -5,6 +5,7 @@ import { lookOf } from "../features/office/looks.ts";
 import { postJson, useFetch } from "../lib/hooks.ts";
 import { useDivisionName, useOffice } from "../state/store.ts";
 import { PROJECT_STATUS } from "./ProjectsPanel.tsx";
+import { RevisionForm } from "./RevisionForm.tsx";
 
 interface Task {
   id: string;
@@ -101,10 +102,17 @@ function TaskRow({ t, titleOf, onRetry, busy }: { t: Task; titleOf: (id: string)
         ) : (
           <p className={`text-sm mt-1.5 whitespace-pre-wrap ${t.status === "failed" ? "text-danger" : "text-ink"}`}>{t.resultSummary}</p>
         ))}
-      {(t.status === "failed" || t.status === "cancelled") && (
-        <button type="button" className="btn btn-ghost mt-2" onClick={onRetry} disabled={busy}>
-          Coba lagi
-        </button>
+      {(t.status === "failed" || t.status === "cancelled" || t.status === "done") && (
+        <div className="task-actions">
+          {(t.status === "failed" || t.status === "cancelled") && (
+            <button type="button" className="btn btn-sm btn-ghost" onClick={onRetry} disabled={busy}>
+              Coba lagi
+            </button>
+          )}
+          {(t.status === "done" || t.status === "failed") && !(t.divisionId === "pm" && t.title === PLAN_TASK) && (
+            <RevisionForm taskId={t.id} divisionId={t.divisionId} />
+          )}
+        </div>
       )}
     </li>
   );

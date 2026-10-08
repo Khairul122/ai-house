@@ -18,6 +18,7 @@ async function bootstrap() {
 
   const adapter = new FastifyAdapter({
     logger: false,
+    bodyLimit: 40 * 1024 * 1024, // formulir proyek bisa membawa berkas perencanaan hingga 25 MB
     // Rute dashboard (/projects/123, dst.) dijawab index.html agar router React yang mengambil alih.
     rewriteUrl: (req: IncomingMessage) => {
       const url = req.url ?? "/";

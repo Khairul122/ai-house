@@ -8,6 +8,7 @@ import { useAgentStatus } from "../state/useAgentStatus.ts";
 import { ApprovalCard } from "./ApprovalCard.tsx";
 import { CharacterCard, ReligionPicker } from "./CharacterCard.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
+import { RevisionForm } from "./RevisionForm.tsx";
 import { TASK_STATUS } from "./ProjectPanel.tsx";
 
 export const STATUS_LABEL: Record<AgentStatus, string> = {
@@ -85,7 +86,8 @@ interface WorkItem {
   projectTitle: string;
 }
 
-function WorkRow({ w }: { w: WorkItem }) {
+function WorkRow({ w, divisionId }: { w: WorkItem; divisionId: string }) {
+  const revisable = (w.status === "done" || w.status === "failed") && !(divisionId === "pm" && w.title === "Menyusun rencana proyek");
   const [label, tone] = TASK_STATUS[w.status] ?? [w.status, ""];
   const summary = w.resultSummary?.trim();
   return (
@@ -112,10 +114,15 @@ function WorkRow({ w }: { w: WorkItem }) {
         ) : (
           <p className={`text-sm mt-1.5 whitespace-pre-wrap ${w.status === "failed" ? "text-danger" : "text-ink"}`}>{summary}</p>
         ))}
-      {w.status === "done" && (
-        <Link to={`/projects/${w.projectId}`} className="text-xs text-accent underline underline-offset-2 mt-1.5 inline-block">
-          Lihat berkas hasil
-        </Link>
+      {(w.status === "done" || revisable) && (
+        <div className="task-actions">
+          {w.status === "done" && (
+            <Link to={`/projects/${w.projectId}`} className="text-xs text-accent underline underline-offset-2">
+              Lihat berkas hasil
+            </Link>
+          )}
+          {revisable && <RevisionForm taskId={w.id} divisionId={divisionId} />}
+        </div>
       )}
     </li>
   );
@@ -139,7 +146,7 @@ function DivisionWork({ id }: { id: string }) {
       </p>
       <ol className="divide-y divide-line border-y border-line">
         {data.map((w) => (
-          <WorkRow key={w.id} w={w} />
+          <WorkRow key={w.id} w={w} divisionId={id} />
         ))}
       </ol>
     </section>

@@ -13,6 +13,7 @@ import { AuditService } from "../audit/audit.service.js";
 import { type DivisionEntity, FileDivisionRepository } from "../divisions/infrastructure/file-division.repository.js";
 import { EventBusService } from "../events/event-bus.service.js";
 import { getAutonomy } from "../settings/autonomy.js";
+import { readBrief } from "../projects/application/brief.js";
 import { TaskService } from "../tasks/application/task.service.js";
 
 type Task = typeof tasks.$inferSelect;
@@ -202,7 +203,7 @@ export class OrchestratorService implements OnModuleInit {
 
 Tujuan proyek "${project.title}": ${project.goal}
 
-Pecah tujuan ini menjadi tugas untuk divisi lain. Tulis hasilnya ke berkas plan.json di folder kerja ini, berupa JSON:
+${this.briefSection(project)}Pecah tujuan ini menjadi tugas untuk divisi lain. Tulis hasilnya ke berkas plan.json di folder kerja ini, berupa JSON:
 {"title": string, "goal": string, "tasks": [{"title": string, "divisionId": string, "description": string, "doneCriteria": string, "dependsOnTitles": string[]}]}
 Judul tugas harus unik. dependsOnTitles merujuk judul tugas lain di rencana yang sama.
 Jangan bertanya kepada pemilik; tentukan sendiri rencana yang masuk akal.
@@ -288,7 +289,7 @@ ${ids}`;
         if (this.live.size >= this.maxRuns) break;
         const division = this.divisions.loadById(t.divisionId);
         this.eventBus.publish("task.dispatched", { taskId: t.id, from: "pm", to: t.divisionId, title: t.title });
-        const { finished } = await this.launch(t, this.taskPrompt(t, division));
+        const { finished } = await this.launch(t, this.taskPrompt(t, division, project.workspacePath));
         void finished.then(() => this.tickAll());
       }
 
@@ -304,9 +305,56 @@ ${ids}`;
     }
   }
 
-  private taskPrompt(t: Task, division: DivisionEntity | null) {
-    return `${division?.prompt ?? ""}
+  // Isi brief langsung dimasukkan ke prompt PM (sudah ringkas); berkas lain dibaca PM sendiri.
+  private briefSection(project: Project) {
+    const brief = readBrief(project.workspacePath);
+    if (!brief) return "";
+    return `Brief lengkap dari pemilik (juga tersimpan di brief/brief.md, berkas pendukung di folder brief/):
+${brief}
 
+Baca berkas pendukung yang relevan di folder brief/ sebelum menyusun rencana. Bila brief menyebut divisi yang dilibatkan, gunakan hanya divisi tersebut.
+
+`;
+  }
+
+  // Revisi: tugas baru untuk divisi yang sama di proyek yang sama, berisi hasil sebelumnya dan catatan pemilik.
+  // Agen bekerja di folder yang sama sehingga memperbaiki berkas yang sudah ada, bukan mulai dari nol.
+  async reviseTask(taskId: string, note: string) {
+    const task = await db.query.tasks.findFirst({ where: eq(tasks.id, taskId) });
+    if (!task) throw new NotFoundException("Tugas tidak ditemukan.");
+    const clean = note.trim();
+    if (clean.length < 3) throw new ConflictException("Tulis catatan revisi (minimal 3 karakter).");
+    if (clean.length > 4000) throw new ConflictException("Catatan revisi terlalu panjang (maksimal 4000 karakter).");
+    if (task.status === "running" || task.status === "queued") throw new ConflictException("Tugas ini masih antre atau berjalan. Tunggu selesai dulu.");
+    if (task.divisionId === "pm" && task.title === PLAN_TASK_TITLE) {
+      throw new ConflictException("Rencana PM tidak direvisi lewat sini. Buat proyek baru atau minta revisi pada tugas divisi.");
+    }
+    const project = await this.mustProject(task.projectId);
+    if (project.status === "planning" || project.status === "plan_review") throw new ConflictException("Proyek sedang direncanakan. Tunggu rencananya selesai.");
+
+    const base = task.title.replace(/^Revisi \d+: /, "");
+    const siblings = (await this.taskService.listProjectTasks(project.id)).filter((t) => t.divisionId === task.divisionId && t.title.replace(/^Revisi \d+: /, "") === base);
+    const n = siblings.filter((t) => /^Revisi \d+: /.test(t.title)).length + 1;
+    const previous = task.resultSummary ? task.resultSummary.slice(0, 1500) : "(tidak ada ringkasan)";
+    const revision = await this.insertTask(
+      project.id,
+      task.divisionId,
+      `Revisi ${n}: ${base}`,
+      `Revisi atas tugas "${base}" yang sudah dikerjakan di folder ini.\n\nHasil sebelumnya:\n${previous}\n\nPermintaan revisi dari pemilik:\n${clean}\n\nPerbaiki berkas yang sudah ada sesuai permintaan, jangan mulai dari nol kecuali diminta.`,
+      "Semua poin permintaan revisi terpenuhi dan dijelaskan di ringkasan."
+    );
+    await this.audit.record("owner", "revision_requested", "task", revision.id, { title: revision.title, note: clean.slice(0, 300) });
+    if (project.status !== "in_progress") await this.setProjectStatus(project, "in_progress");
+    void this.tickAll();
+    return revision;
+  }
+
+  private taskPrompt(t: Task, division: DivisionEntity | null, workspace: string) {
+    const brief = fs.existsSync(path.join(workspace, "brief", "brief.md"))
+      ? "\nBrief proyek dan berkas perencanaan dari pemilik ada di folder brief/ (mulai dari brief/brief.md); baca yang relevan.\n"
+      : "";
+    return `${division?.prompt ?? ""}
+${brief}
 ${t.description}
 Kriteria selesai: ${t.doneCriteria}
 Bekerjalah hanya di dalam folder kerja ini. Akhiri dengan ringkasan singkat hasil kerja.
