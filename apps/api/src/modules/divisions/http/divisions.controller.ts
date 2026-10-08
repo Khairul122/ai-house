@@ -1,4 +1,5 @@
 import { BadGatewayException, BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Patch } from "@nestjs/common";
+import { ReligionSchema } from "@ai-house/shared";
 import { desc, eq } from "drizzle-orm";
 import { db } from "../../../db/index.js";
 import { projects, tasks } from "../../../db/schema/index.js";
@@ -79,12 +80,19 @@ export class DivisionsController {
   }
 
   @Patch("divisions/:id")
-  async update(@Param("id") id: string, @Body() body: { model?: string }) {
-    if (!body.model) throw new BadRequestException("Model wajib diisi.");
-    const known = await listRouterModels();
-    if (!known.some((m) => m.id === body.model)) throw new BadRequestException(`Model ${body.model} tidak ada di 9router.`);
-    const updated = this.divisionRepo.setModel(id, body.model);
-    if (!updated) throw new NotFoundException("Divisi tidak ditemukan.");
-    return updated;
+  async update(@Param("id") id: string, @Body() body: { model?: string; religion?: string }) {
+    if (!body.model && !body.religion) throw new BadRequestException("Isi model atau religion.");
+    if (!this.divisionRepo.loadById(id)) throw new NotFoundException("Divisi tidak ditemukan.");
+    if (body.religion !== undefined) {
+      const religion = ReligionSchema.safeParse(body.religion);
+      if (!religion.success) throw new BadRequestException(`Agama tidak dikenal. Pilih: ${ReligionSchema.options.join(", ")}.`);
+      this.divisionRepo.setField(id, "religion", religion.data);
+    }
+    if (body.model !== undefined) {
+      const known = await listRouterModels();
+      if (!known.some((m) => m.id === body.model)) throw new BadRequestException(`Model ${body.model} tidak ada di 9router.`);
+      this.divisionRepo.setField(id, "model", body.model);
+    }
+    return this.divisionRepo.loadById(id);
   }
 }

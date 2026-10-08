@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { postJson } from "../lib/hooks.ts";
 import { useOffice } from "../state/store.ts";
@@ -14,7 +14,32 @@ function summary(statuses: string[]): string {
   return parts.length ? parts.join(" · ") : "Semua divisi sedang santai";
 }
 
+// Layar penuh untuk seluruh aplikasi (kanvas 3D + panel). Tombol F sebagai pintasan.
+function useFullscreen() {
+  const [full, setFull] = useState(() => !!document.fullscreenElement);
+  useEffect(() => {
+    const sync = () => setFull(!!document.fullscreenElement);
+    const onKey = (e: KeyboardEvent) => {
+      const typing = (e.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable]");
+      if (e.key.toLowerCase() === "f" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) toggle();
+    };
+    document.addEventListener("fullscreenchange", sync);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("fullscreenchange", sync);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
+  return full;
+}
+
+function toggle() {
+  if (document.fullscreenElement) void document.exitFullscreen();
+  else void document.documentElement.requestFullscreen?.().catch(() => {});
+}
+
 export function Hud({ selectedId }: { selectedId: string | null }) {
+  const full = useFullscreen();
   const navigate = useNavigate();
   const connection = useOffice((s) => s.connection);
   const statuses = useOffice((s) => Object.values(s.agents).map((a) => a.status).join(","));
@@ -42,6 +67,9 @@ export function Hud({ selectedId }: { selectedId: string | null }) {
             Seluruh kantor
           </button>
         )}
+        <button type="button" className="hud-btn" onClick={toggle} aria-pressed={full} title="Pintasan: F">
+          {full ? "Keluar layar penuh" : "Layar penuh"}
+        </button>
         {import.meta.env.DEV && (
           <div className="flex flex-col items-end">
             <button type="button" className="hud-btn" onClick={runDemo} disabled={demoBusy}>

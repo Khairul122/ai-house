@@ -5,13 +5,14 @@ import { ProjectPlanSchema } from "@ai-house/shared";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { ulid } from "ulid";
 import { db } from "../../db/index.js";
-import { approvals, projects, runs, taskDependencies, tasks } from "../../db/schema/index.js";
+import { approvals, auditLog, projects, runs, taskDependencies, tasks } from "../../db/schema/index.js";
 import { AGENT_RUNTIME, type AgentRuntime, type RunEvent } from "../agents/domain/agent-runtime.port.js";
 import { ApprovalService } from "../approvals/application/approval.service.js";
 import { assessPermission } from "../approvals/domain/permission-assessor.js";
 import { AuditService } from "../audit/audit.service.js";
 import { type DivisionEntity, FileDivisionRepository } from "../divisions/infrastructure/file-division.repository.js";
 import { EventBusService } from "../events/event-bus.service.js";
+import { getAutonomy } from "../settings/autonomy.js";
 import { TaskService } from "../tasks/application/task.service.js";
 
 type Task = typeof tasks.$inferSelect;
@@ -87,6 +88,58 @@ export class OrchestratorService implements OnModuleInit {
     };
   }
 
+  // Laporan kerja proyek: apa yang dikerjakan tiap divisi, hasilnya, dan semua aksi berisiko
+  // yang dijalankan otomatis atau ditolak, supaya pemilik bisa menilai tanpa ikut menyetujui satu per satu.
+  async report(projectId: string) {
+    const { project, tasks: list } = await this.detail(projectId);
+    const runRows = list.length ? await db.query.runs.findMany({ where: inArray(runs.taskId, list.map((t) => t.id)) }) : [];
+    const runTask = new Map(runRows.map((r) => [r.id, r.taskId]));
+    const decisions = runRows.length
+      ? await db.query.approvals.findMany({ where: inArray(approvals.runId, runRows.map((r) => r.id)) })
+      : [];
+    const denied = list.length
+      ? await db.query.auditLog.findMany({
+          where: and(eq(auditLog.eventType, "permission_denied"), inArray(auditLog.subjectId, list.map((t) => t.id)))
+        })
+      : [];
+    const started = runRows.map((r) => r.startedAt).sort()[0] ?? null;
+    const ended = runRows.map((r) => r.endedAt).filter((x): x is string => !!x).sort().at(-1) ?? null;
+    return {
+      project,
+      startedAt: started,
+      endedAt: project.status === "completed" || project.status === "failed" || project.status === "cancelled" ? ended : null,
+      tasks: list.map((t) => ({
+        id: t.id,
+        divisionId: t.divisionId,
+        title: t.title,
+        status: t.status,
+        attempt: t.attempt,
+        summary: t.resultSummary
+      })),
+      actions: decisions
+        .map((a) => ({
+          id: a.id,
+          taskId: runTask.get(a.runId) ?? null,
+          summary: a.actionSummary,
+          riskLevel: a.riskLevel,
+          status: a.status,
+          decidedBy: a.decidedBy,
+          at: a.decidedAt ?? a.expiresAt
+        }))
+        .sort((x, y) => (x.at ?? "").localeCompare(y.at ?? "")),
+      denied: denied.map((d) => ({ taskId: d.subjectId, at: d.occurredAt, ...(JSON.parse(d.detailJson) as { summary?: string; reason?: string }) }))
+    };
+  }
+
+  // Dipanggil saat beralih ke mode otomatis: yang sedang menunggu pemilik langsung dilanjutkan.
+  async applyAutonomy() {
+    for (const approvalId of [...this.waiting.keys()]) {
+      await this.approvals.decide(approvalId, "approved", "otomatis").catch(() => {});
+    }
+    const reviewing = await db.query.projects.findMany({ where: eq(projects.status, "plan_review") });
+    for (const p of reviewing) await this.approvePlan(p.id).catch(() => {});
+  }
+
   // ---------- perencanaan ----------
 
   async planProject(projectId: string) {
@@ -150,7 +203,13 @@ ${ids}`;
         }
       }
       await this.audit.record("pm", "project_planned", "project", projectId, { title: project.title, taskCount: plan.tasks.length });
-      await this.setProjectStatus(project, "plan_review");
+      if ((await getAutonomy()) === "auto") {
+        await this.audit.record("otomatis", "plan_approved", "project", projectId, { title: project.title });
+        await this.setProjectStatus(project, "in_progress");
+        void this.tickAll();
+      } else {
+        await this.setProjectStatus(project, "plan_review");
+      }
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
       await this.finishTask(planTaskId, "failed", `Rencana PM tidak valid: ${reason}`.slice(0, 600));
@@ -289,6 +348,8 @@ Bekerjalah hanya di dalam folder kerja ini. Akhiri dengan ringkasan singkat hasi
     }
 
     const id = ulid();
+    const auto = (await getAutonomy()) === "auto";
+    const now = new Date();
     await db.insert(approvals).values({
       id,
       runId,
@@ -296,8 +357,14 @@ Bekerjalah hanya di dalam folder kerja ini. Akhiri dengan ringkasan singkat hasi
       actionType: ev.permission,
       actionSummary: summary,
       payloadJson: JSON.stringify({ permissionId: ev.permissionId, patterns: ev.patterns }),
-      expiresAt: new Date(Date.now() + this.approvalTimeoutMs).toISOString()
+      expiresAt: new Date(now.getTime() + this.approvalTimeoutMs).toISOString(),
+      // mode otomatis: tetap disimpan sebagai persetujuan agar muncul di laporan
+      ...(auto ? { status: "approved", decidedBy: "otomatis", decidedAt: now.toISOString() } : {})
     });
+    if (auto) {
+      await this.audit.record(division.id, "auto_approved", "approval", id, { summary, riskLevel: verdict.riskLevel });
+      return this.runtime.respondPermission(runId, ev.permissionId, "allow");
+    }
     this.waiting.set(id, { runId, permissionId: ev.permissionId });
     await this.audit.record(division.id, "approval_requested", "approval", id, { summary });
     this.eventBus.publish("approval.created", { id, divisionId: division.id, taskId: task.id, summary, riskLevel: verdict.riskLevel });

@@ -1,6 +1,7 @@
 import { CameraControls, Html } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
+import { Campus } from "./Campus.tsx";
 import { Character } from "./Character.tsx";
 import { CORRIDOR_HALF, FLOOR_HALF_X, FLOOR_HALF_Z, ROOMS, roomById } from "./layout.ts";
 import { MAT } from "./looks.ts";
@@ -22,7 +23,9 @@ function CameraRig({ selectedId, panelOpen, reducedMotion }: Pick<OfficeProps, "
   const { size } = useThree();
   const portrait = size.height > size.width;
   // Di layar tegak, koridor diputar memanjang dari atas ke bawah agar gedung tidak mengecil.
-  const fit = portrait ? Math.min(size.width / 17, size.height / 38) : Math.min(size.width / 33, size.height / 21);
+  const officeFit = portrait ? Math.min(size.width / 17, size.height / 38) : Math.min(size.width / 33, size.height / 21);
+  // Tampilan awal: gedung beserta kampus di sekitarnya; bisa di-zoom keluar sampai seluruh kampus terlihat.
+  const fit = portrait ? Math.min(size.width / 30, size.height / 62) : Math.min(size.width / 60, size.height / 38);
   const wide = size.width >= 768;
 
   useEffect(() => {
@@ -34,7 +37,7 @@ function CameraRig({ selectedId, panelOpen, reducedMotion }: Pick<OfficeProps, "
     if (!c) return;
     const anim = !reducedMotion;
     const room = selectedId ? roomById(selectedId) : null;
-    const zoom = room ? Math.max(fit * 2.4, 55) : fit;
+    const zoom = room ? Math.max(officeFit * 2.4, 55) : fit;
     if (room) void c.moveTo(room.x, 0.6, room.z, anim);
     else void c.moveTo(0, 0, 0, anim);
     void c.zoomTo(zoom, anim);
@@ -42,13 +45,13 @@ function CameraRig({ selectedId, panelOpen, reducedMotion }: Pick<OfficeProps, "
     const ox = panelOpen && wide ? PANEL_W / 2 / zoom : 0;
     const oy = panelOpen && !wide ? (size.height * 0.34) / zoom : 0;
     void c.setFocalOffset(ox, oy, 0, anim);
-  }, [selectedId, panelOpen, fit, wide, size.height, reducedMotion]);
+  }, [selectedId, panelOpen, fit, officeFit, wide, size.height, reducedMotion]);
 
   return (
     <CameraControls
       ref={ref}
       makeDefault
-      minZoom={fit * 0.7}
+      minZoom={fit * 0.6}
       maxZoom={160}
       minPolarAngle={0.45}
       maxPolarAngle={1.15}
@@ -112,14 +115,14 @@ export default function OfficeCanvas(props: OfficeProps) {
     >
       <hemisphereLight args={["#FFF6E8", "#B8A890", 1.15]} />
       <directionalLight
-        position={[14, 24, 10]}
+        position={[30, 50, 20]}
         intensity={1.7}
         castShadow
-        shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-22}
-        shadow-camera-right={22}
-        shadow-camera-top={22}
-        shadow-camera-bottom={-22}
+        shadow-mapSize={[4096, 4096]}
+        shadow-camera-left={-55}
+        shadow-camera-right={55}
+        shadow-camera-top={55}
+        shadow-camera-bottom={-55}
         shadow-bias={-0.0005}
       />
 
@@ -133,6 +136,7 @@ export default function OfficeCanvas(props: OfficeProps) {
         <Character key={r.id} id={r.id} reducedMotion={reducedMotion} onSelect={onSelect} />
       ))}
       <Commons onOpenProjects={onOpenProjects} />
+      <Campus />
 
       <CameraRig {...props} />
     </Canvas>

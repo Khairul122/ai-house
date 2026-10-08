@@ -35,11 +35,15 @@ export const ApprovalStatusSchema = z.enum([
   "expired"
 ]);
 
+export const ReligionSchema = z.enum(["islam", "protestan", "katolik", "hindu", "buddha", "konghucu"]);
+
 export const DivisionConfigSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
   model: z.string(),
+  // agama karakter divisi di kantor 3D (menentukan tempat dan waktu ibadahnya)
+  religion: ReligionSchema.optional(),
   permission: z.object({
     read: z.enum(["allow", "deny"]).default("allow"),
     edit: z.enum(["workspace", "deny"]).default("workspace"),

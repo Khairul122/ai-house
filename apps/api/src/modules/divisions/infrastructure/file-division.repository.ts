@@ -9,6 +9,7 @@ export interface DivisionEntity {
   name: string;
   description: string;
   model: string;
+  religion?: DivisionConfig["religion"];
   prompt: string;
   promptHash: string;
   permission: DivisionConfig["permission"];
@@ -44,15 +45,20 @@ export class FileDivisionRepository {
     return this.loadFile(filePath);
   }
 
-  // Mengganti baris `model:` di frontmatter tanpa menyentuh isi lain berkas.
   setModel(id: string, model: string): DivisionEntity | null {
+    return this.setField(id, "model", model);
+  }
+
+  // Mengganti (atau menambah) satu baris `kunci: nilai` tingkat atas di frontmatter tanpa menyentuh isi lain.
+  setField(id: string, key: "model" | "religion", value: string): DivisionEntity | null {
     const filePath = path.join(this.divisionsDir, `${id}.md`);
     if (!fs.existsSync(filePath)) return null;
     const raw = fs.readFileSync(filePath, "utf-8");
     const end = raw.indexOf("\n---", 3);
     if (!raw.startsWith("---") || end < 0) throw new Error(`Frontmatter ${id}.md tidak valid.`);
     const head = raw.slice(0, end);
-    const nextHead = /^model:.*$/m.test(head) ? head.replace(/^model:.*$/m, `model: ${model}`) : `${head}\nmodel: ${model}`;
+    const line = new RegExp(`^${key}:.*$`, "m");
+    const nextHead = line.test(head) ? head.replace(line, `${key}: ${value}`) : `${head}\n${key}: ${value}`;
     fs.writeFileSync(filePath, nextHead + raw.slice(end));
     return this.loadFile(filePath);
   }
@@ -73,6 +79,7 @@ export class FileDivisionRepository {
       name: parsed.name,
       description: parsed.description,
       model: parsed.model,
+      religion: parsed.religion,
       prompt: parsed.prompt,
       promptHash,
       permission: parsed.permission

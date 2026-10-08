@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 // Database terpisah agar tes tidak menyentuh data/house.db milik Anda.
 // Modul di-import dinamis supaya DATABASE_URL terpasang sebelum koneksi dibuat.
 process.env.DATABASE_URL = "file:./data/test-orchestrator.db";
+process.env.AUTONOMY = "ask"; // tes alur persetujuan manual; mode otomatis diuji terpisah di bawah
 
 const waitFor = async <T>(check: () => Promise<T | undefined | false>, ms = 5000): Promise<T> => {
   const end = Date.now() + ms;
@@ -103,6 +104,29 @@ describe("Orkestrasi proyek (runtime tiruan)", () => {
     expect((await mods.office.listPendingApprovals()).filter((a) => a.divisionId === "software-development")).toHaveLength(0);
 
     fs.rmSync(project.workspacePath, { recursive: true, force: true });
+  });
+
+  it("mode otomatis: tanpa menunggu pemilik, aksi level 3 tercatat di laporan", async () => {
+    const { orchestrator, projects } = services;
+    const { setAutonomy } = await import("../src/modules/settings/autonomy.js");
+    await setAutonomy("auto");
+    try {
+      const project = await projects.createProject("Otomatis", "Uji mode otomatis");
+      const status = async () => (await orchestrator.detail(project.id)).project.status;
+
+      await orchestrator.planProject(project.id);
+      await waitFor(async () => (await status()) === "completed");
+      expect((await mods.office.listPendingApprovals()).filter((a) => a.divisionId === "software-development")).toHaveLength(0);
+
+      const report = await orchestrator.report(project.id);
+      expect(report.tasks.every((t) => t.status === "done")).toBe(true);
+      expect(report.actions).toHaveLength(1);
+      expect(report.actions[0]).toMatchObject({ summary: "npm install express", status: "approved", decidedBy: "otomatis", riskLevel: 3 });
+      expect(report.endedAt).not.toBeNull();
+      fs.rmSync(project.workspacePath, { recursive: true, force: true });
+    } finally {
+      await setAutonomy("ask");
+    }
   });
 
   it("menolak izin menggagalkan tugas, lalu bisa dicoba lagi", async () => {

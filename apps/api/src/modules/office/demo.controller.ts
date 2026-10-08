@@ -30,7 +30,7 @@ export class DemoController {
   @Post("simulate")
   async simulate() {
     if (process.env.NODE_ENV === "production") throw new ForbiddenException("Demo dimatikan di production.");
-    const project = await this.projectService.createProject("Demo: Landing page kedai kopi", "Simulasi alur kerja kantor");
+    const project = await this.projectService.createProject("Demo: Landing page kedai kopi", "Simulasi alur kerja kantor", undefined, { demo: true });
     void this.run(project.id).catch((e) => console.error("Demo gagal", e));
     return { ok: true, projectId: project.id };
   }
