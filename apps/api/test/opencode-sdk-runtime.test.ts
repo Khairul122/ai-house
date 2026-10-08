@@ -38,8 +38,11 @@ describe("OpenCodeSdkRuntime", () => {
           }, 10);
         } else if (req.url === "/api/session/ses_1/permission/per_1/reply") {
           json({});
-          setTimeout(() => push("session.execution.succeeded", { sessionID: "ses_1" }), 10);
-        } else if (req.url === "/api/session/ses_1") json({ tokens: { input: 120, output: 45 } });
+          // agen sempat memakai alat pertanyaan; runtime harus menolaknya agar tidak menunggu selamanya
+          setTimeout(() => push("question.asked", { id: "que_1", sessionID: "ses_1", questions: [{ question: "Deploy sekarang?", options: [] }] }), 5);
+          setTimeout(() => push("session.execution.succeeded", { sessionID: "ses_1" }), 40);
+        } else if (req.url === "/api/session/ses_1/question/que_1/reject") json({});
+        else if (req.url === "/api/session/ses_1") json({ tokens: { input: 120, output: 45 } });
         else if (req.url === "/api/session/ses_1/message") {
           json([
             { id: "msg_0", text: "Tugas" },
@@ -99,6 +102,7 @@ describe("OpenCodeSdkRuntime", () => {
     expect(cfg.permissions.map((r: { action: string }) => r.action)).toContain("shell");
     fs.rmSync(ws, { recursive: true, force: true });
     expect(JSON.parse(seen.find((s) => s.url.endsWith("/reply"))!.body)).toEqual({ decision: "once" });
+    expect(seen.some((x) => x.url === "/api/session/ses_1/question/que_1/reject" && x.method === "POST")).toBe(true);
     expect(seen[0].auth).toBe(`Basic ${Buffer.from("opencode:rahasia").toString("base64")}`);
   });
 });

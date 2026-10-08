@@ -205,6 +205,7 @@ Tujuan proyek "${project.title}": ${project.goal}
 Pecah tujuan ini menjadi tugas untuk divisi lain. Tulis hasilnya ke berkas plan.json di folder kerja ini, berupa JSON:
 {"title": string, "goal": string, "tasks": [{"title": string, "divisionId": string, "description": string, "doneCriteria": string, "dependsOnTitles": string[]}]}
 Judul tugas harus unik. dependsOnTitles merujuk judul tugas lain di rencana yang sama.
+Jangan bertanya kepada pemilik; tentukan sendiri rencana yang masuk akal.
 divisionId wajib salah satu dari:
 ${ids}`;
   }
@@ -308,7 +309,10 @@ ${ids}`;
 
 ${t.description}
 Kriteria selesai: ${t.doneCriteria}
-Bekerjalah hanya di dalam folder kerja ini. Akhiri dengan ringkasan singkat hasil kerja.`;
+Bekerjalah hanya di dalam folder kerja ini. Akhiri dengan ringkasan singkat hasil kerja.
+Aturan saat bekerja di AI House:
+- Tidak ada manusia yang memantau selama tugas berjalan. Jangan bertanya; putuskan sendiri dengan pilihan paling aman dan tulis asumsimu di ringkasan akhir.
+- Jangan melakukan deployment ke server publik, produksi, atau layanan berbayar. Siapkan konfigurasinya, uji secara lokal, lalu tulis langkah rilis yang tersisa di ringkasan.`;
   }
 
   // Menandai tugas berjalan (ditunggu), lalu mengembalikan janji selesainya: true bila sukses.
@@ -385,6 +389,16 @@ Bekerjalah hanya di dalam folder kerja ini. Akhiri dengan ringkasan singkat hasi
   }
 
   private async onPermission(runId: string, task: Task, division: DivisionEntity, workspace: string, ev: Extract<RunEvent, { type: "permission" }>) {
+    // Alat "question" menunggu jawaban manusia yang tidak pernah datang; ditolak dengan arahan, bukan aksi berisiko.
+    if (ev.permission === "question") {
+      await this.audit.record(division.id, "question_skipped", "task", task.id, { title: task.title });
+      return this.runtime.respondPermission(
+        runId,
+        ev.permissionId,
+        "deny",
+        "Tidak ada yang bisa menjawab pertanyaan selama tugas berjalan. Putuskan sendiri dengan pilihan paling aman dan tulis asumsimu di ringkasan."
+      );
+    }
     const verdict = assessPermission(division.permission, workspace, ev.permission, ev.patterns);
     const summary = ev.permission === "bash" || ev.permission === "shell" ? ev.patterns.join(" && ") : `${ev.permission}: ${ev.patterns.join(", ")}`;
 

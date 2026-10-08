@@ -68,7 +68,7 @@ export class FakeAgentRuntime implements AgentRuntime {
     await this.callbacks.get(runId)?.({ type: "error", message: "Run dibatalkan." });
   }
 
-  async respondPermission(runId: string, permissionId: string, decision: "allow" | "deny"): Promise<void> {
+  async respondPermission(runId: string, permissionId: string, decision: "allow" | "deny", _message?: string): Promise<void> {
     const finish = this.pending.get(permissionId);
     this.pending.delete(permissionId);
     if (!finish) return;

@@ -23,7 +23,7 @@ export type RunEvent =
 export interface AgentRuntime {
   startRun(input: StartRunInput): Promise<void>;
   cancelRun(runId: string): Promise<void>;
-  respondPermission(runId: string, permissionId: string, decision: "allow" | "deny"): Promise<void>;
+  respondPermission(runId: string, permissionId: string, decision: "allow" | "deny", message?: string): Promise<void>;
   onEvent(runId: string, callback: (event: RunEvent) => Promise<void> | void): void;
 }
 

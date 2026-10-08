@@ -46,11 +46,12 @@ export class OpenCodeSdkRuntime implements AgentRuntime {
     this.forget(runId);
   }
 
-  async respondPermission(runId: string, permissionId: string, decision: "allow" | "deny"): Promise<void> {
+  async respondPermission(runId: string, permissionId: string, decision: "allow" | "deny", message?: string): Promise<void> {
     const sessionID = this.sessionOf.get(runId);
     if (!sessionID) return;
     await this.api("POST", `/api/session/${sessionID}/permission/${permissionId}/reply`, {
-      decision: decision === "allow" ? "once" : "reject"
+      decision: decision === "allow" ? "once" : "reject",
+      ...(message ? { message } : {})
     });
   }
 
@@ -151,6 +152,10 @@ export class OpenCodeSdkRuntime implements AgentRuntime {
     }
 
     switch (ev.type) {
+      case "question.asked":
+        // Tidak ada manusia yang menjawab selama run berjalan: tolak agar agen memutuskan sendiri.
+        await this.api("POST", `/api/session/${sessionID}/question/${d.id}/reject`).catch(() => {});
+        return;
       case "permission.asked":
         // v2 server: { action, resources }; skema lama: { permission, patterns }
         this.busy.add(sessionID);
