@@ -24,7 +24,11 @@ export const PLAN_TASK_TITLE = "Menyusun rencana proyek";
 interface LiveRun {
   taskId: string;
   projectId: string;
+  lastActivity: number;
 }
+
+// Percobaan maksimum per tugas saat run macet dicoba ulang otomatis.
+const MAX_ATTEMPTS = 3;
 
 // Mengatur alur proyek: PM merencanakan, Anda menyetujui rencana, tugas dijalankan
 // sesuai ketergantungan dan batas run bersamaan, izin berisiko menunggu keputusan Anda.
@@ -33,6 +37,10 @@ export class OrchestratorService implements OnModuleInit {
   private live = new Map<string, LiveRun>(); // runId
   private waiting = new Map<string, { runId: string; permissionId: string }>(); // approvalId
   private cancelling = new Set<string>(); // runId
+  private stalled = new Set<string>(); // runId yang dihentikan pengawas karena tidak ada aktivitas
+  private watchdog: ReturnType<typeof setInterval> | null = null;
+  // Run tanpa tanda hidup selama ini dianggap macet (mis. model/9router tidak menjawab).
+  private readonly idleTimeoutMs = Number(process.env.RUN_IDLE_TIMEOUT_MS) || (Number(process.env.RUN_IDLE_TIMEOUT_MIN) || 8) * 60_000;
   private queue: Promise<unknown> = Promise.resolve();
   private readonly maxRuns = Number(process.env.MAX_CONCURRENT_RUNS) || 2;
   private readonly approvalTimeoutMs = (Number(process.env.APPROVAL_TIMEOUT_MIN) || 30) * 60_000;
@@ -46,7 +54,30 @@ export class OrchestratorService implements OnModuleInit {
     @Inject(FileDivisionRepository) private readonly divisions: FileDivisionRepository
   ) {}
 
+  onModuleDestroy() {
+    if (this.watchdog) clearInterval(this.watchdog);
+  }
+
+  // Pengawas run macet. Run yang sedang menunggu persetujuan pemilik tidak dihitung macet.
+  startWatchdog() {
+    if (this.watchdog) return;
+    this.watchdog = setInterval(() => void this.checkStalled(), Math.min(30_000, Math.max(50, this.idleTimeoutMs / 4)));
+    this.watchdog.unref?.();
+  }
+
+  private async checkStalled() {
+    const waitingRuns = new Set([...this.waiting.values()].map((w) => w.runId));
+    for (const [runId, run] of this.live) {
+      if (waitingRuns.has(runId) || this.stalled.has(runId)) continue;
+      if (Date.now() - run.lastActivity < this.idleTimeoutMs) continue;
+      this.stalled.add(runId);
+      await this.audit.record("pengawas", "run_stalled", "task", run.taskId, { minutes: Math.round(this.idleTimeoutMs / 60000) });
+      await this.runtime.cancelRun(runId).catch(() => {});
+    }
+  }
+
   async onModuleInit() {
+    this.startWatchdog();
     this.listen();
     await this.recoverAfterRestart();
     // Proyek yang sedang berjalan saat server mati dinilai ulang: lanjut, atau ditandai gagal agar bisa dicoba lagi.
@@ -293,7 +324,7 @@ Bekerjalah hanya di dalam folder kerja ini. Akhiri dengan ringkasan singkat hasi
     const now = new Date().toISOString();
     await db.insert(runs).values({ id: runId, taskId: task.id, sessionId: runId, status: "running", startedAt: now });
     await db.update(tasks).set({ status: "running", updatedAt: now }).where(eq(tasks.id, task.id));
-    this.live.set(runId, { taskId: task.id, projectId: task.projectId });
+    this.live.set(runId, { taskId: task.id, projectId: task.projectId, lastActivity: Date.now() });
     this.publishTask(task, "running");
 
     const finished = new Promise<boolean>((resolve) => {
@@ -301,12 +332,28 @@ Bekerjalah hanya di dalam folder kerja ini. Akhiri dengan ringkasan singkat hasi
         if (!this.live.has(runId)) return;
         this.live.delete(runId);
         const cancelled = this.cancelling.delete(runId);
+        const stalled = this.stalled.delete(runId);
+        if (stalled) {
+          summary = `Agen tidak menunjukkan aktivitas selama ${Math.round(this.idleTimeoutMs / 60000)} menit (model kemungkinan tidak menjawab), jadi dihentikan otomatis.`;
+        }
         await db.update(runs).set({ status: cancelled ? "cancelled" : status, endedAt: new Date().toISOString(), error: status === "failed" ? summary : null }).where(eq(runs.id, runId));
         await this.finishTask(task.id, cancelled ? "cancelled" : status, summary);
+        // Mode otomatis: run macet dicoba ulang sendiri sampai batas percobaan.
+        if (stalled && !cancelled && task.attempt < MAX_ATTEMPTS && (await getAutonomy()) === "auto") {
+          const fresh = await db.query.tasks.findFirst({ where: eq(tasks.id, task.id) });
+          if (fresh?.status === "failed") {
+            if (fresh.divisionId === "pm" && fresh.title === PLAN_TASK_TITLE) {
+              await this.setProjectStatus(await this.mustProject(task.projectId), "draft");
+              void this.planProject(task.projectId).catch(() => {});
+            } else await this.requeue(fresh);
+          }
+        }
         resolve(status === "done" && !cancelled);
       };
 
       this.runtime.onEvent(runId, async (ev: RunEvent) => {
+        const live = this.live.get(runId);
+        if (live) live.lastActivity = Date.now();
         if (ev.type === "permission") {
           // Galat saat menilai izin tidak boleh membuat agen menunggu selamanya: tolak saja.
           await this.onPermission(runId, task, division, project.workspacePath, ev).catch(async (e) => {

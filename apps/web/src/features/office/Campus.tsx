@@ -6,6 +6,7 @@ import { atmo } from "./Atmosphere.tsx";
 import { CAMPUS_HALF_X, CAMPUS_HALF_Z, LEISURE, LIBRARY, PARK, PLAZA_Z, POOL, PROMENADE_Z, RING_X, WORSHIP, WORSHIP_Z } from "./layout.ts";
 import { MAT } from "./looks.ts";
 import { Monument } from "./Monument.tsx";
+import { StaticBatch } from "./StaticBatch.tsx";
 import { Box, type V3 } from "./parts.tsx";
 
 const GRASS = "#A7B88A";
@@ -282,7 +283,7 @@ function StreetLamp({ p }: { p: V3 }) {
     <group position={p}>
       <Box p={[0, 1.3, 0]} s={[0.12, 2.6, 0.12]} c="#4A4E54" />
       <Box p={[0, 2.66, 0]} s={[0.5, 0.12, 0.5]} c="#4A4E54" />
-      <mesh ref={bulb} position={[0, 2.52, 0]}>
+      <mesh ref={bulb} position={[0, 2.52, 0]} userData={{ dynamic: true }}>
         <boxGeometry args={[0.32, 0.14, 0.32]} />
         <meshStandardMaterial color="#FFF1CC" emissive="#FFC870" emissiveIntensity={0} />
       </mesh>
@@ -316,7 +317,7 @@ function Pool() {
   return (
     <group>
       <Box p={[x, 0.05, z]} s={[w + 4, 0.1, d + 4]} c="#E4DCCB" shadow={false} />
-      <mesh ref={water} position={[x, 0.13, z]} receiveShadow>
+      <mesh ref={water} position={[x, 0.13, z]} receiveShadow userData={{ dynamic: true }}>
         <boxGeometry args={[w, 0.04, d]} />
         <meshStandardMaterial color="#5FA8C9" emissive="#2C6E8E" emissiveIntensity={0.25} roughness={0.15} />
       </mesh>
@@ -414,7 +415,7 @@ function Park() {
         <cylinderGeometry args={[0.55, 0.25, 0.2, 14]} />
         <meshStandardMaterial color="#B8AE9C" />
       </mesh>
-      <mesh ref={jet} position={[0, 1.9, 0]}>
+      <mesh ref={jet} position={[0, 1.9, 0]} userData={{ dynamic: true }}>
         <cylinderGeometry args={[0.06, 0.12, 0.7, 8]} />
         <meshStandardMaterial color="#BFE3F2" transparent opacity={0.7} />
       </mesh>
@@ -445,7 +446,7 @@ const TREES: [number, number, number][] = [
 
 export function Campus() {
   return (
-    <group>
+    <StaticBatch>
       <Box p={[0, -0.12, 0]} s={[CAMPUS_HALF_X * 2, 0.1, CAMPUS_HALF_Z * 2]} c={GRASS} shadow={false} />
       {/* jalan setapak */}
       <Box p={[0, -0.05, PROMENADE_Z]} s={[84, 0.04, 1.8]} c={PAVE} shadow={false} />
@@ -485,6 +486,6 @@ export function Campus() {
       {TREES.map(([x, z, s]) => (
         <Tree key={`${x}${z}`} p={[x, 0, z]} s={s} />
       ))}
-    </group>
+    </StaticBatch>
   );
 }

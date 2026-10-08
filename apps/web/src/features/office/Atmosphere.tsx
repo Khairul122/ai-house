@@ -96,7 +96,8 @@ function Clouds() {
 
 // Cahaya matahari/bulan, langit, kabut, hujan, awan, dan suara sekitar mengikuti waktu dan cuaca.
 export function Atmosphere() {
-  const { scene } = useThree();
+  const { scene, gl } = useThree();
+  const frame = useRef(0);
   const sun = useRef<DirectionalLight>(null);
   const hemi = useRef<HemisphereLight>(null);
   const night = useRef<PointLight[]>([]);
@@ -105,15 +106,20 @@ export function Atmosphere() {
   const sound = useEnv((s) => s.sound);
 
   useEffect(() => {
+    // bayangan dihitung ulang tiap 2 frame, bukan tiap frame: hampir tak terlihat bedanya, separuh biayanya
+    gl.shadowMap.autoUpdate = false;
+    gl.shadowMap.needsUpdate = true;
     scene.background = new Color("#E9EEF0");
     scene.fog = new FogExp2("#E9EEF0", 0);
     return () => {
       scene.fog = null;
       setRain(false);
     };
-  }, [scene]);
+  }, [scene, gl]);
 
   useFrame(({ clock }, delta) => {
+    frame.current++;
+    if (frame.current % 2 === 0) gl.shadowMap.needsUpdate = true;
     const weather = env.weather();
     const phase = env.phase();
     atmo.weather = weather;
@@ -159,7 +165,7 @@ export function Atmosphere() {
         position={[20, 60, 15]}
         intensity={1.7}
         castShadow
-        shadow-mapSize={[4096, 4096]}
+        shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-55}
         shadow-camera-right={55}
         shadow-camera-top={55}

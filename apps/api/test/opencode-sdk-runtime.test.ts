@@ -83,7 +83,8 @@ describe("OpenCodeSdkRuntime", () => {
     });
     await done;
 
-    expect(events).toEqual([
+    expect(events.some((e) => e.type === "activity")).toBe(true); // tanda hidup untuk pengawas run macet
+    expect(events.filter((e) => e.type !== "activity")).toEqual([
       { type: "permission", permissionId: "per_1", permission: "shell", patterns: ["npm install"] },
       { type: "usage", tokensIn: 120, tokensOut: 45 },
       { type: "done", summary: "Halaman selesai dibuat." }

@@ -1,6 +1,6 @@
 import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { type Camera, type Group, type OrthographicCamera, Vector3 } from "three";
 import type { AgentStatus, Dispatch } from "../../state/reduce.ts";
 import { play, type SoundName } from "../../lib/sound.ts";
@@ -178,6 +178,8 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
   const bang = useRef<Group>(null);
   const talk = useRef<HTMLDivElement>(null);
   const talkAnchor = useRef<Group>(null);
+  const talkOn = useRef(false);
+  const [talkVisible, setTalkVisible] = useState(false);
   const umbrella = useRef<Group>(null);
   const emotionIcons = useRef<Group>(null);
   const incense = useRef<Group>(null);
@@ -664,16 +666,20 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       bang.current.position.y = 1.78 + (fresh && !reducedMotion ? Math.abs(Math.sin(now / 140)) * 0.12 : 0);
     }
 
-    // Gelembung obrolan / tidur, diubah langsung tanpa render ulang React.
+    // Gelembung obrolan / tidur. Elemen HTML hanya dipasang saat ada teks (HTML di kanvas
+    // dihitung ulang posisinya tiap frame), isinya diubah langsung tanpa render ulang React.
+    let text = "";
+    if (act === "chat" && meet) {
+      const turn = turnOf(meet, now);
+      if (turn?.speaker === id) text = lineFor(id, turn.turn);
+    } else if (act === "sleep" && pose === "lie") text = "Zzz";
+    if (!!text !== talkOn.current) {
+      talkOn.current = !!text;
+      setTalkVisible(!!text);
+    }
     const el = talk.current;
     if (el) {
-      let text = "";
-      if (act === "chat" && meet) {
-        const turn = turnOf(meet, now);
-        if (turn?.speaker === id) text = lineFor(id, turn.turn);
-      } else if (act === "sleep" && pose === "lie") text = "Zzz";
       if (el.textContent !== text) el.textContent = text;
-      el.style.display = text ? "" : "none";
       el.className = text === "Zzz" ? "speech speech-sleep" : "speech";
     }
     // berbaring: kepala ada di belakang kaki, jadi gelembung ikut pindah
@@ -683,12 +689,25 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
   return (
     <group
       ref={root}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect(id);
-      }}
     >
       <group ref={tilt}>
+        <mesh
+          visible={false}
+          position={[0, 0.75, 0]}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(id);
+          }}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            document.body.style.cursor = "pointer";
+          }}
+          onPointerOut={() => {
+            document.body.style.cursor = "";
+          }}
+        >
+          <boxGeometry args={[0.7, 1.5, 0.6]} />
+        </mesh>
         {[legL, legR].map((ref, i) => (
           <group key={i} ref={ref} position={[i ? 0.11 : -0.11, 0.45, 0]}>
             <Box p={[0, -0.21, 0]} s={[0.17, 0.42, 0.19]} c={PANTS} />
@@ -796,13 +815,13 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
         </Html>
       )}
 
-      {status === "idle" && (
-        <group ref={talkAnchor} position={[0, 1.75, 0]}>
+      <group ref={talkAnchor} position={[0, 1.75, 0]}>
+        {status === "idle" && talkVisible && (
           <Html center zIndexRange={[10, 0]} pointerEvents="none">
-            <div ref={talk} className="speech" style={{ display: "none" }} />
+            <div ref={talk} className="speech" />
           </Html>
-        </group>
-      )}
+        )}
+      </group>
     </group>
   );
 }

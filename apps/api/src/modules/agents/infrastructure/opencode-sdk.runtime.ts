@@ -13,6 +13,7 @@ export class OpenCodeSdkRuntime implements AgentRuntime {
   private sessionOf = new Map<string, string>(); // runId -> sessionID
   private runOf = new Map<string, string>(); // sessionID -> runId
   private busy = new Set<string>(); // session yang sudah mulai bekerja
+  private lastBeat = new Map<string, number>(); // runId -> waktu tanda hidup terakhir yang dikirim
   private stream: Promise<void> | null = null;
 
   constructor(baseUrl = process.env.OPENCODE_SERVER_URL || "http://127.0.0.1:4096") {
@@ -69,6 +70,7 @@ export class OpenCodeSdkRuntime implements AgentRuntime {
     }
     this.sessionOf.delete(runId);
     this.callbacks.delete(runId);
+    this.lastBeat.delete(runId);
   }
 
   private async api<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
@@ -140,6 +142,13 @@ export class OpenCodeSdkRuntime implements AgentRuntime {
     const sessionID: string | undefined = d.sessionID ?? ev.aggregateID ?? d.part?.sessionID;
     const runId = sessionID ? this.runOf.get(sessionID) : undefined;
     if (!sessionID || !runId) return;
+
+    // setiap event dari session berarti agen masih hidup; dikirim paling sering tiap 5 detik
+    const now = Date.now();
+    if (now - (this.lastBeat.get(runId) ?? 0) > 5000) {
+      this.lastBeat.set(runId, now);
+      await this.emit(runId, { type: "activity" });
+    }
 
     switch (ev.type) {
       case "permission.asked":

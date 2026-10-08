@@ -69,7 +69,7 @@ export function Monument({ position, rotation = 0 }: { position: [number, number
         <meshStandardMaterial color="#C9A227" roughness={0.45} metalness={0.3} />
       </mesh>
       {/* prasasti di muka depan (+z) */}
-      <mesh position={[0, 3.05, 0.56]}>
+      <mesh position={[0, 3.05, 0.56]} userData={{ dynamic: true }}>
         <planeGeometry args={[2.1, 2.62]} />
         <meshStandardMaterial ref={glow} map={texture} emissive="#E8D9A8" emissiveMap={texture} emissiveIntensity={0.15} roughness={0.8} />
       </mesh>

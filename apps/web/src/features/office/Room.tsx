@@ -7,6 +7,10 @@ import { useAgentStatus } from "../../state/useAgentStatus.ts";
 import { ROOM_D, ROOM_W, type RoomDef, WALL_H } from "./layout.ts";
 import { lookOf, MAT } from "./looks.ts";
 import { Box, type V3 } from "./parts.tsx";
+import { StaticBatch } from "./StaticBatch.tsx";
+
+// Properti khas yang tidak bergantung status dan tidak bisa diklik (boleh digabung).
+const STATIC_SIGNATURE = new Set(["ui-ux-design", "qa-testing", "cybersecurity", "data-analyst", "research-content", "infrastructure-network"]);
 
 const HW = ROOM_W / 2;
 const HD = ROOM_D / 2;
@@ -187,22 +191,27 @@ export function Room({ room, selected, onSelect, onBoard }: RoomProps) {
   };
 
   return (
-    <group
-      position={[room.x, 0, room.z]}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect(room.id);
-      }}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        setHover(true);
-        document.body.style.cursor = "pointer";
-      }}
-      onPointerOut={() => {
-        setHover(false);
-        document.body.style.cursor = "";
-      }}
-    >
+    <group position={[room.x, 0, room.z]}>
+      {/* Area klik: satu kotak tak terlihat seluas lantai, bukan ratusan mesh ruangan. */}
+      <mesh
+        visible={false}
+        position={[0, 0.15, 0]}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect(room.id);
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHover(true);
+          document.body.style.cursor = "pointer";
+        }}
+        onPointerOut={() => {
+          setHover(false);
+          document.body.style.cursor = "";
+        }}
+      >
+        <boxGeometry args={[ROOM_W, 0.3, ROOM_D]} />
+      </mesh>
       <group rotation={[0, room.side === "s" ? Math.PI : 0, 0]}>
         <Box
           p={[0, 0.02, 0]}
@@ -227,23 +236,26 @@ export function Room({ room, selected, onSelect, onBoard }: RoomProps) {
         {/* lampu status di dinding belakang: hanya menyala bila ada keadaan yang berarti */}
         <Box p={[0.9, 1.45, -HD + 0.09]} s={[0.5, 0.07, 0.05]} c={lamp ?? MAT.wallTop} emissive={lamp ?? undefined} glow={lamp ? 1 : 0} shadow={false} />
 
-        {/* meja, kursi, monitor */}
-        <Box p={[0, 0.72, -0.2]} s={[1.5, 0.06, 0.7]} c={MAT.wood} />
-        {[
-          [-0.68, -0.48],
-          [0.68, -0.48],
-          [-0.68, 0.08],
-          [0.68, 0.08]
-        ].map(([x, z]) => (
-          <Box key={`${x}${z}`} p={[x, 0.35, z]} s={[0.06, 0.7, 0.06]} c={MAT.woodDark} />
-        ))}
+        {/* meja, kursi, tanaman, dan properti yang tidak berubah: digabung jadi beberapa draw call */}
+        <StaticBatch>
+          <Box p={[0, 0.72, -0.2]} s={[1.5, 0.06, 0.7]} c={MAT.wood} />
+          {[
+            [-0.68, -0.48],
+            [0.68, -0.48],
+            [-0.68, 0.08],
+            [0.68, 0.08]
+          ].map(([x, z]) => (
+            <Box key={`${x}${z}`} p={[x, 0.35, z]} s={[0.06, 0.7, 0.06]} c={MAT.woodDark} />
+          ))}
+          <Box p={[0, 0.2, -0.95]} s={[0.06, 0.4, 0.06]} c={MAT.metal} />
+          <Box p={[0, 0.42, -0.95]} s={[0.5, 0.07, 0.5]} c="#4A4E54" />
+          <Box p={[0, 0.72, -1.2]} s={[0.5, 0.55, 0.07]} c="#4A4E54" />
+          <Plant p={[HW - 0.35, 0, -HD + 0.35]} />
+          {STATIC_SIGNATURE.has(room.id) && <Signature id={room.id} status={status} onBoard={handleBoard} />}
+        </StaticBatch>
         <Monitor p={[0, 0.75, 0.0]} status={status} />
-        <Box p={[0, 0.2, -0.95]} s={[0.06, 0.4, 0.06]} c={MAT.metal} />
-        <Box p={[0, 0.42, -0.95]} s={[0.5, 0.07, 0.5]} c="#4A4E54" />
-        <Box p={[0, 0.72, -1.2]} s={[0.5, 0.55, 0.07]} c="#4A4E54" />
-
-        <Signature id={room.id} status={status} onBoard={handleBoard} />
-        <Plant p={[HW - 0.35, 0, -HD + 0.35]} />
+        {/* properti yang berubah sesuai status atau bisa diklik tetap terpisah */}
+        {!STATIC_SIGNATURE.has(room.id) && <Signature id={room.id} status={status} onBoard={handleBoard} />}
 
         <Html position={[0, WALL_H + 0.25, HD]} center zIndexRange={[10, 0]} pointerEvents="none">
           <div className={`room-sign${selected ? " is-selected" : ""}`} style={{ borderColor: look.accent }}>
