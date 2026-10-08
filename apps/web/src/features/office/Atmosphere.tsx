@@ -1,6 +1,6 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
-import { Color, type DirectionalLight, FogExp2, type HemisphereLight, type InstancedMesh, Object3D, type PointLight, Vector3 } from "three";
+import { Color, type DirectionalLight, FogExp2, type HemisphereLight, type InstancedMesh, type Mesh, type OrthographicCamera, Object3D, type PointLight, MeshStandardMaterial, ShaderMaterial, Vector3 } from "three";
 import { play, setRain } from "../../lib/sound.ts";
 import { env, useEnv } from "../../state/env.ts";
 import { lightingFor, type Phase, type Weather } from "./environment.ts";
@@ -62,6 +62,11 @@ const CLOUDS: [number, number, number, number][] = [
   [-55, 27, 28, 1.3]
 ];
 
+const CLOUD_GREY = new Color("#9AA3AD");
+const CLOUD_WHITE = new Color("#FFFFFF");
+// Satu material per awan; ketiga gumpalannya berbagi material itu (warnanya berubah bersama).
+const cloudMaterials = CLOUDS.map(() => new MeshStandardMaterial({ color: "#FFFFFF", transparent: true, opacity: 0.92, roughness: 1 }));
+
 function Clouds() {
   const group = useRef<import("three").Group>(null);
   useFrame((_, delta) => {
@@ -73,24 +78,55 @@ function Clouds() {
       if (c.position.x > 70) c.position.x = -70;
       c.visible = atmo.weather !== "panas" || c.position.z > 0; // cuaca panas: langit lebih bersih
       const mat = (c.children[0] as import("three").Mesh).material as import("three").MeshStandardMaterial;
-      mat.color.lerp(new Color(grey ? "#8E979F" : "#FFFFFF"), 0.02);
+      mat.color.lerp(grey ? CLOUD_GREY : CLOUD_WHITE, 0.02);
     }
   });
   return (
     <group ref={group}>
-      {CLOUDS.map(([x, y, z, s]) => (
+      {CLOUDS.map(([x, y, z, s], i) => (
         <group key={`${x}${z}`} position={[x, y, z]} scale={s}>
-          <mesh>
-            <boxGeometry args={[7, 1.6, 4]} />
-            <meshStandardMaterial color="#FFFFFF" transparent opacity={0.85} />
+          {/* awan bulat: tiga gumpalan dengan satu material bersama per awan */}
+          <mesh scale={[3.4, 1.3, 2.2]} material={cloudMaterials[i]}>
+            <sphereGeometry args={[1, 16, 10]} />
           </mesh>
-          <mesh position={[1.5, 0.9, 0.3]}>
-            <boxGeometry args={[4, 1.4, 3]} />
-            <meshStandardMaterial color="#FFFFFF" transparent opacity={0.85} />
+          <mesh position={[2.3, 0.5, 0.2]} scale={[2.2, 1.4, 1.7]} material={cloudMaterials[i]}>
+            <sphereGeometry args={[1, 16, 10]} />
+          </mesh>
+          <mesh position={[-2.2, 0.15, -0.2]} scale={[1.8, 1, 1.4]} material={cloudMaterials[i]}>
+            <sphereGeometry args={[1, 16, 10]} />
           </mesh>
         </group>
       ))}
     </group>
+  );
+}
+
+// Langit bergradasi: bidang selebar layar yang selalu ditempel di belakang kamera ortografis.
+// (Kamera ortografis tidak punya perspektif, jadi gradasi dibuat di ruang layar, bukan bola langit.)
+const skyMaterial = new ShaderMaterial({
+  uniforms: { top: { value: new Color("#9CC3EE") }, bottom: { value: new Color("#EAF2FB") } },
+  vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader:
+    "uniform vec3 top; uniform vec3 bottom; varying vec2 vUv; void main() { gl_FragColor = vec4(mix(bottom, top, smoothstep(0.0, 1.0, vUv.y)), 1.0); #include <tonemapping_fragment>\n #include <colorspace_fragment>\n }",
+  depthWrite: false,
+  fog: false
+});
+
+function Sky() {
+  const ref = useRef<Mesh>(null);
+  useFrame(({ camera }) => {
+    const m = ref.current;
+    if (!m) return;
+    const cam = camera as OrthographicCamera;
+    m.position.copy(cam.position);
+    m.quaternion.copy(cam.quaternion);
+    m.translateZ(-(cam.far - 5));
+    m.scale.set((cam.right - cam.left) / cam.zoom + 2, (cam.top - cam.bottom) / cam.zoom + 2, 1);
+  });
+  return (
+    <mesh ref={ref} material={skyMaterial} renderOrder={-1000} frustumCulled={false}>
+      <planeGeometry args={[1, 1]} />
+    </mesh>
   );
 }
 
@@ -129,6 +165,8 @@ export function Atmosphere() {
 
     target.sky.set(l.sky);
     (scene.background as Color).lerp(target.sky, k);
+    skyMaterial.uniforms.bottom.value.copy(scene.background as Color);
+    skyMaterial.uniforms.top.value.lerp(target.hs.set(l.skyTop), k);
     const fog = scene.fog as FogExp2;
     fog.color.copy(scene.background as Color);
     fog.density += (l.fog - fog.density) * k;
@@ -166,6 +204,7 @@ export function Atmosphere() {
         intensity={1.7}
         castShadow
         shadow-mapSize={[2048, 2048]}
+        shadow-radius={4}
         shadow-camera-left={-55}
         shadow-camera-right={55}
         shadow-camera-top={55}
@@ -186,6 +225,7 @@ export function Atmosphere() {
           decay={1.6}
         />
       ))}
+      <Sky />
       <Rain />
       <Clouds />
     </>

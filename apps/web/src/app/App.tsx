@@ -3,8 +3,10 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useMatch, useNavig
 import { BottomNav } from "../components/BottomNav.tsx";
 import { CommandPalette } from "../components/CommandPalette.tsx";
 import { Hud } from "../components/Hud.tsx";
+import { Minimap } from "../components/Minimap.tsx";
 import { Roster } from "../components/Roster.tsx";
 import { Toasts } from "../components/Toasts.tsx";
+import { ViewControls } from "../components/ViewControls.tsx";
 import { Fallback2D } from "../features/office/Fallback2D.tsx";
 import { isTyping } from "../lib/fullscreen.ts";
 import { useReducedMotion } from "../lib/hooks.ts";
@@ -85,6 +87,8 @@ function Shell() {
 
       <Hud onOpenPalette={() => setPalette(true)} />
       <Roster selectedId={selectedId} />
+      {webgl && <Minimap selectedId={selectedId} />}
+      {webgl && <ViewControls />}
 
       <Routes>
         <Route path="/" element={null} />

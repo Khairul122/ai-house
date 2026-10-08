@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { CanvasTexture, type MeshStandardMaterial, SRGBColorSpace } from "three";
 import { useHouse } from "../../state/store.ts";
 import { atmo } from "./Atmosphere.tsx";
-import { BRAND } from "./looks.ts";
+import { TONES } from "./looks.ts";
 import { Box } from "./parts.tsx";
 
 const STONE = "#F4F5F6";
@@ -37,8 +37,8 @@ function useInscription(name: string) {
       // papan putih bersih dengan empat garis warna di atas dan bawah
       g.fillStyle = "#FFFFFF";
       g.fillRect(0, 0, canvas.width, canvas.height);
-      const band = canvas.width / BRAND.length;
-      BRAND.forEach((c, i) => {
+      const band = canvas.width / TONES.length;
+      TONES.forEach((c, i) => {
         g.fillStyle = c;
         g.fillRect(i * band, 0, band, 36);
         g.fillRect(i * band, canvas.height - 36, band, 36);
@@ -60,7 +60,7 @@ function useInscription(name: string) {
         fit(bottom, 600, 120);
         g.fillText(bottom, canvas.width / 2, 740);
       }
-      BRAND.forEach((c, i) => {
+      TONES.forEach((c, i) => {
         g.fillStyle = c;
         g.fillRect(canvas.width / 2 - 160 + i * 80, 880, 80, 10);
       });
@@ -92,7 +92,7 @@ export function Monument({ position, rotation = 0 }: { position: [number, number
       <Box p={[0, 5.35, 0]} s={[2.7, 0.3, 1.35]} c={STONE_DARK} />
       <mesh position={[0, 5.9, 0]} castShadow>
         <coneGeometry args={[0.95, 0.8, 4]} />
-        <meshStandardMaterial color={BRAND[0]} roughness={0.45} metalness={0.1} />
+        <meshStandardMaterial color={TONES[0]} roughness={0.45} metalness={0.1} />
       </mesh>
       {/* prasasti di muka depan (+z) */}
       <mesh position={[0, 3.05, 0.56]} userData={{ dynamic: true }}>

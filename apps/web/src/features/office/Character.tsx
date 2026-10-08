@@ -6,7 +6,9 @@ import type { AgentStatus, Dispatch } from "../../state/reduce.ts";
 import { play, type SoundName } from "../../lib/sound.ts";
 import { env } from "../../state/env.ts";
 import { office, useCoordinatorId, useDivisions } from "../../state/store.ts";
+import { setFocus, useFocus } from "../../state/focus.ts";
 import { useAgentStatus } from "../../state/useAgentStatus.ts";
+import { CharacterPeek } from "./CharacterPeek.tsx";
 import {
   type Act,
   deskOf,
@@ -164,6 +166,7 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
   const look = useLook(id);
   // koordinator yang mengantar map tugas ke divisi tujuan
   const isCoordinator = useCoordinatorId() === id;
+  const focused = useFocus() === id;
   const { agent, status } = useAgentStatus(id);
 
   const root = useRef<Group>(null);
@@ -698,7 +701,7 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
           position={[0, 0.75, 0]}
           onClick={(e) => {
             e.stopPropagation();
-            onSelect(id);
+            setFocus(focused ? null : id);
           }}
           onPointerOver={(e) => {
             e.stopPropagation();
@@ -811,7 +814,19 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
         </group>
       )}
 
-      {status === "working" && agent?.task && (
+      {focused && (
+        <CharacterPeek
+          id={id}
+          status={status}
+          task={agent?.task?.title}
+          onOpen={() => {
+            setFocus(null);
+            onSelect(id);
+          }}
+        />
+      )}
+
+      {!focused && status === "working" && agent?.task && (
         <Html position={[0, 1.85, 0]} center zIndexRange={[10, 0]} pointerEvents="none">
           <div className="speech">{agent.task.title}</div>
         </Html>

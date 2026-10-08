@@ -7,8 +7,9 @@ import { STATUS_LABEL } from "../../panels/DivisionsPanel.tsx";
 import { useDivisionName } from "../../state/store.ts";
 import { useAgentStatus } from "../../state/useAgentStatus.ts";
 import { ROOM_D, ROOM_W, type RoomDef, WALL_H } from "./layout.ts";
-import { lookOf, MAT, type Signature as SignatureKind, useLook } from "./looks.ts";
+import { lookOf, MAT, type Signature as SignatureKind, tint, useLook } from "./looks.ts";
 import { Box, type V3 } from "./parts.tsx";
+import { BeanBag, BigPlant, glassMaterial, RoundRug } from "./props.tsx";
 import { StaticBatch } from "./StaticBatch.tsx";
 
 // Properti khas yang tidak bergantung status dan tidak bisa diklik (boleh digabung).
@@ -27,16 +28,9 @@ const SCREEN: Record<AgentStatus, [string, number]> = {
   done: [MAT.done, 0.7]
 };
 
-// Warna aksen dicampur putih, untuk karpet yang tidak terlalu mencolok.
-function tint(hex: string, white: number) {
-  const n = Number.parseInt(hex.slice(1), 16);
-  const mix = (c: number) => Math.round(c + (255 - c) * white);
-  return `#${[(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => mix(c).toString(16).padStart(2, "0")).join("")}`;
-}
-
-// Dinding yang menghadap kamera turun rendah (gaya potongan rumah boneka) agar isi ruangan terlihat.
-// `accent`: panel warna di muka dalam dinding, ikut turun bersama dindingnya.
-function Wall({ p, s, n, accent }: { p: V3; s: V3; n: [number, number]; accent?: string }) {
+// Dinding belakang yang padat. Saat menghadap kamera ia turun rendah (gaya potongan rumah boneka)
+// agar isi ruangan terlihat. `accent`: panel warna di muka dalam dinding, ikut turun bersamanya.
+function Wall({ p, s, n, accent, lamp }: { p: V3; s: V3; n: [number, number]; accent?: string; lamp?: string | null }) {
   const ref = useRef<Mesh>(null);
   const dir = useMemo(() => new Vector3(), []);
   useFrame(({ camera }) => {
@@ -50,32 +44,27 @@ function Wall({ p, s, n, accent }: { p: V3; s: V3; n: [number, number]; accent?:
   return (
     <Box ref={ref} p={p} s={s} c={MAT.wall}>
       {accent && <Box p={[0, s[1] * 0.06, s[2] / 2 + 0.006]} s={[s[0] * 0.9, s[1] * 0.7, 0.012]} c={accent} shadow={false} />}
+      {/* lampu status: hanya menyala bila ada keadaan yang berarti, ikut turun bersama dinding */}
+      {lamp !== undefined && (
+        <Box p={[0.9, 1.45 - s[1] / 2, s[2] / 2 + 0.03]} s={[0.5, 0.07, 0.05]} c={lamp ?? MAT.wallTop} emissive={lamp ?? undefined} glow={lamp ? 1 : 0} shadow={false} />
+      )}
     </Box>
   );
 }
 
-// Bean bag bulat di pojok ruangan.
-function BeanBag({ p, c }: { p: V3; c: string }) {
+// Dinding kaca dengan bingkai putih tipis di atas dan bawah serta tiang di kedua ujung.
+// Panjang panel searah sumbu x lokal; dirotasi untuk dinding samping.
+function Glass({ p, len, ry = 0 }: { p: V3; len: number; ry?: number }) {
   return (
-    <group position={p}>
-      <mesh position={[0, 0.2, 0]} scale={[1, 0.62, 1]} castShadow receiveShadow>
-        <sphereGeometry args={[0.36, 14, 10]} />
-        <meshStandardMaterial color={c} roughness={0.9} />
+    <group position={p} rotation={[0, ry, 0]}>
+      <mesh material={glassMaterial} position={[0, WALL_H / 2, 0]}>
+        <boxGeometry args={[len, WALL_H - 0.1, 0.04]} />
       </mesh>
-      <mesh position={[0, 0.36, -0.12]} scale={[0.9, 0.55, 0.6]}>
-        <sphereGeometry args={[0.3, 12, 8]} />
-        <meshStandardMaterial color={c} roughness={0.9} />
-      </mesh>
-    </group>
-  );
-}
-
-function Plant({ p }: { p: V3 }) {
-  return (
-    <group position={p}>
-      <Box p={[0, 0.15, 0]} s={[0.3, 0.3, 0.3]} c={MAT.pot} />
-      <Box p={[0, 0.5, 0]} s={[0.42, 0.42, 0.42]} c={MAT.plant} />
-      <Box p={[0.05, 0.82, -0.03]} s={[0.24, 0.24, 0.24]} c="#6E9156" />
+      <Box p={[0, WALL_H - 0.03, 0]} s={[len, 0.06, 0.09]} c={MAT.wall} shadow={false} />
+      <Box p={[0, 0.04, 0]} s={[len, 0.08, 0.09]} c={MAT.wall} shadow={false} />
+      {[-len / 2, len / 2].map((x) => (
+        <Box key={x} p={[x, WALL_H / 2, 0]} s={[0.08, WALL_H, 0.09]} c={MAT.wall} shadow={false} />
+      ))}
     </group>
   );
 }
@@ -255,38 +244,32 @@ export function Room({ room, selected, onSelect, onBoard, tone }: RoomProps) {
           glow={selected ? 0.22 : hover ? 0.12 : 0}
           shadow={false}
         />
-        <Wall p={[0, WALL_H / 2, -HD]} s={[ROOM_W + T, WALL_H, T]} n={[0, -flip]} accent={tone} />
-        <Wall p={[-HW, WALL_H / 2, 0]} s={[T, WALL_H, ROOM_D]} n={[-flip, 0]} />
-        <Wall p={[HW, WALL_H / 2, 0]} s={[T, WALL_H, ROOM_D]} n={[flip, 0]} />
-        {[-1, 1].map((side) => (
-          <Wall
-            key={side}
-            p={[side * (DOOR / 2 + (HW - DOOR / 2) / 2), WALL_H / 2, HD]}
-            s={[HW - DOOR / 2 + T / 2, WALL_H, T]}
-            n={[0, flip]}
-          />
-        ))}
+        <Wall p={[0, WALL_H / 2, -HD]} s={[ROOM_W + T, WALL_H, T]} n={[0, -flip]} accent={tone} lamp={lamp} />
 
-        {/* lampu status di dinding belakang: hanya menyala bila ada keadaan yang berarti */}
-        <Box p={[0.9, 1.45, -HD + 0.09]} s={[0.5, 0.07, 0.05]} c={lamp ?? MAT.wallTop} emissive={lamp ?? undefined} glow={lamp ? 1 : 0} shadow={false} />
 
         {/* meja, kursi, tanaman, dan properti yang tidak berubah: digabung jadi beberapa draw call */}
         <StaticBatch>
-          <Box p={[0, 0.72, -0.2]} s={[1.5, 0.06, 0.7]} c={MAT.wood} />
+          {/* dinding kaca: dua sisi dan bagian depan di kiri-kanan pintu */}
+          <Glass p={[-HW, 0, 0]} len={ROOM_D} ry={Math.PI / 2} />
+          <Glass p={[HW, 0, 0]} len={ROOM_D} ry={Math.PI / 2} />
+          {[-1, 1].map((side) => (
+            <Glass key={side} p={[side * (DOOR / 2 + (HW - DOOR / 2) / 2), 0, HD]} len={HW - DOOR / 2} />
+          ))}
+          <RoundRug p={[0, 0.05, -0.4]} r={1.15} c={tint(tone, 0.45)} />
+          <Box p={[0, 0.72, -0.2]} s={[1.5, 0.06, 0.7]} c={MAT.wall} />
           {[
             [-0.68, -0.48],
             [0.68, -0.48],
             [-0.68, 0.08],
             [0.68, 0.08]
           ].map(([x, z]) => (
-            <Box key={`${x}${z}`} p={[x, 0.35, z]} s={[0.06, 0.7, 0.06]} c={MAT.woodDark} />
+            <Box key={`${x}${z}`} p={[x, 0.35, z]} s={[0.06, 0.7, 0.06]} c={MAT.wood} />
           ))}
           <Box p={[0, 0.2, -0.95]} s={[0.06, 0.4, 0.06]} c={MAT.metal} />
           <Box p={[0, 0.42, -0.95]} s={[0.5, 0.07, 0.5]} c={tone} />
           <Box p={[0, 0.72, -1.2]} s={[0.5, 0.55, 0.07]} c={tone} />
-          <Box p={[0, 0.05, -0.45]} s={[2.4, 0.02, 1.9]} c={tint(tone, 0.72)} shadow={false} />
           <BeanBag p={[-HW + 0.55, 0, HD - 0.6]} c={tone} />
-          <Plant p={[HW - 0.35, 0, -HD + 0.35]} />
+          <BigPlant p={[HW - 0.45, 0, -HD + 0.45]} s={0.75} />
           {fixed && <Signature id={room.id} status={status} onBoard={handleBoard} />}
         </StaticBatch>
         <Monitor p={[0, 0.75, 0.0]} status={status} />

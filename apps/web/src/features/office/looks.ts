@@ -81,23 +81,30 @@ export function useCoordinatorLabel(): string {
   return id ? lookOf(id).short : "Koordinator";
 }
 
-// Empat warna aksen kampus teknologi: biru, merah, kuning, hijau. Dipakai bergantian di ruangan,
-// lantai koridor, sepeda, payung, dan bean bag. Bangunan sendiri tetap putih dan abu-abu terang.
-export const BRAND = ["#4285F4", "#EA4335", "#FBBC05", "#34A853"] as const;
-export const brandAt = (i: number) => BRAND[((i % BRAND.length) + BRAND.length) % BRAND.length];
+// Warna pastel untuk ruangan dan benda kampus (gaya maket arsitek). Dipakai bergantian sesuai urutan ruangan.
+export const TONES = ["#9DBEF2", "#F5A3A0", "#F7D47C", "#97D3B0", "#C4B5EE", "#F6B98A"] as const;
+export const toneAt = (i: number) => TONES[((i % TONES.length) + TONES.length) % TONES.length];
 
-// Palet material kantor: putih bersih, abu-abu hangat, kayu terang.
+// Warna dicampur putih (0 = asli, 1 = putih), untuk lantai dan karpet yang lembut.
+export function tint(hex: string, white: number) {
+  const n = Number.parseInt(hex.slice(1), 16);
+  const mix = (c: number) => Math.round(c + (255 - c) * white);
+  return `#${[(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => mix(c).toString(16).padStart(2, "0")).join("")}`;
+}
+
+// Palet material: putih hangat, kayu ek terang, kaca kebiruan.
 export const MAT = {
-  concrete: "#E8EAED",
-  corridor: "#DADCE0",
-  wood: "#D9BC92",
-  woodDark: "#A7825A",
-  wall: "#F4F5F6",
-  wallTop: "#E1E3E6",
-  metal: "#5F6368",
-  screenOff: "#202124",
-  plant: "#2E9D4E",
-  pot: "#F8F9FA",
+  concrete: "#F3EFE9",
+  corridor: "#E8D9C4",
+  wood: "#E6CBA6",
+  woodDark: "#B8916A",
+  wall: "#FBFAF8",
+  wallTop: "#EDE9E3",
+  glass: "#D6ECF5",
+  metal: "#6B7079",
+  screenOff: "#2A2D34",
+  plant: "#5DAA6F",
+  pot: "#F4EEE6",
   // status (hanya tiga warna yang punya arti)
   working: "#D7E6F2",
   waiting: "#E0A030",

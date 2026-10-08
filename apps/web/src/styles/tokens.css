@@ -437,3 +437,48 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
   .hud-actions { gap: 4px; }
   .hud-icon, .hud-search { width: 34px; min-height: 34px; }
 }
+
+/* Kartu karakter di dalam kantor 3D */
+.peek-card {
+  width: 240px; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: 14px;
+  padding: 10px 12px 12px; box-shadow: var(--shadow-lg); animation: pop 0.16s var(--ease);
+  transform: translateY(-50%);
+}
+.peek-card .need-track { height: 4px; }
+
+/* Tombol kamera: kanan bawah di layar lebar, kanan atas (di bawah HUD) di layar sempit */
+.view-controls {
+  position: absolute; z-index: 15; right: 12px; bottom: 12px;
+  display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 12px;
+}
+.view-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 34px; height: 34px; padding: 0 8px; border-radius: 8px;
+  font-size: 0.75rem; font-weight: 600; color: var(--ink-muted);
+  transition: background 0.15s, color 0.15s;
+}
+.view-btn:hover { color: var(--ink); background: color-mix(in srgb, var(--line) 45%, transparent); }
+.view-btn.is-on { color: var(--surface); background: var(--ink); }
+.view-tour.is-on { background: var(--accent); }
+.view-sep { width: 1px; height: 20px; background: var(--line); margin: 0 3px; }
+@media (max-width: 1100px) {
+  .view-controls { bottom: auto; top: 60px; }
+}
+@media (max-width: 520px) {
+  .view-tour span { display: none; }
+  .view-btn { min-width: 30px; height: 30px; padding: 0 6px; }
+}
+
+/* Denah mini di kiri bawah (hanya layar lebar) */
+.minimap { position: absolute; z-index: 15; left: 12px; bottom: 12px; width: 250px; padding: 8px; border-radius: 14px; }
+.minimap svg { display: block; width: 100%; height: auto; }
+.minimap-floor { fill: color-mix(in srgb, var(--surface-2) 80%, transparent); stroke: var(--line); stroke-width: 0.15; }
+.minimap-corridor { fill: color-mix(in srgb, var(--line) 55%, transparent); }
+.minimap-room { cursor: pointer; outline: none; }
+.minimap-room rect { transition: fill 0.2s, stroke 0.2s; }
+.minimap-room:hover rect, .minimap-room:focus-visible rect { fill: var(--surface); }
+.minimap-label { font-size: 1.15px; font-weight: 700; fill: #202124; pointer-events: none; }
+.minimap-pulse { animation: blink 1.2s ease-in-out infinite; }
+@media (max-width: 999px) { .minimap { display: none; } }
+@media (min-width: 1000px) { .roster { max-height: calc(100vh - 156px - 128px); } }

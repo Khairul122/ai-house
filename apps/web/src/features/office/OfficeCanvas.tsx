@@ -5,10 +5,15 @@ import { useEffect, useRef, useState } from "react";
 import { Atmosphere } from "./Atmosphere.tsx";
 import { Campus } from "./Campus.tsx";
 import { Character } from "./Character.tsx";
-import { useHouse, useRooms } from "../../state/store.ts";
-import { CORRIDOR_HALF, FLOOR_HALF_X, FLOOR_HALF_Z, roomById } from "./layout.ts";
-import { BRAND, brandAt, MAT } from "./looks.ts";
+import { camera, useCamera } from "../../state/camera.ts";
+import { setFocus } from "../../state/focus.ts";
+import { visibleStatus } from "../../state/reduce.ts";
+import { office, useHouse, useRooms } from "../../state/store.ts";
+import { FlowLayer } from "./FlowLayer.tsx";
+import { CORRIDOR_HALF, FLOOR_HALF_X, FLOOR_HALF_Z, getRooms, roomById } from "./layout.ts";
+import { MAT, TONES, tint, toneAt } from "./looks.ts";
 import { Box } from "./parts.tsx";
+import { BigPlant } from "./props.tsx";
 import { Room } from "./Room.tsx";
 import { StaticBatch } from "./StaticBatch.tsx";
 
@@ -25,6 +30,10 @@ const PANEL_W = 420; // lebar panel samping di laptop, harus sama dengan CSS
 function CameraRig({ selectedId, panelOpen, reducedMotion }: Pick<OfficeProps, "selectedId" | "panelOpen" | "reducedMotion">) {
   const ref = useRef<CameraControls>(null);
   const { size } = useThree();
+  const view = useCamera((c) => c.view);
+  const resetAt = useCamera((c) => c.resetAt);
+  const tour = useCamera((c) => c.tour);
+  const tourTarget = useCamera((c) => c.tourTarget);
   const portrait = size.height > size.width;
   // Di layar tegak, koridor diputar memanjang dari atas ke bawah agar gedung tidak mengecil.
   const officeFit = portrait ? Math.min(size.width / 17, size.height / 38) : Math.min(size.width / 33, size.height / 21);
@@ -32,16 +41,46 @@ function CameraRig({ selectedId, panelOpen, reducedMotion }: Pick<OfficeProps, "
   const fit = portrait ? Math.min(size.width / 30, size.height / 62) : Math.min(size.width / 60, size.height / 38);
   const wide = size.width >= 768;
 
+  // Sudut kamera: isometrik (bawaan), dari atas seperti denah, atau dari depan gedung.
   useEffect(() => {
-    void ref.current?.rotateTo(portrait ? 1.25 : Math.PI / 4, 0.9, false);
-  }, [portrait]);
+    const c = ref.current;
+    if (!c) return;
+    const base = portrait ? 1.25 : Math.PI / 4;
+    const [azimuth, polar] = view === "top" ? [portrait ? Math.PI / 2 : 0, 0.04] : view === "front" ? [0, 1.05] : [base, 0.9];
+    void c.rotateTo(azimuth, polar, !reducedMotion && resetAt > 0);
+  }, [portrait, view, resetAt, reducedMotion]);
+
+  // Menggeser kamera sendiri menghentikan tur.
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const stop = () => camera.get().tour && camera.setTour(false);
+    c.addEventListener("controlstart", stop);
+    return () => c.removeEventListener("controlstart", stop);
+  }, []);
+
+  // Tur otomatis: tiap 5 detik pindah ke ruangan berikutnya, utamakan yang sedang bekerja atau butuh perhatian.
+  useEffect(() => {
+    if (!tour || selectedId) return;
+    let i = 0;
+    const next = () => {
+      const rooms = getRooms();
+      const agents = office.get().agents;
+      const busy = rooms.filter((r) => visibleStatus(agents[r.id]) !== "idle");
+      const pool = busy.length ? busy : rooms;
+      if (pool.length) camera.setTourTarget(pool[i++ % pool.length].id);
+    };
+    next();
+    const t = setInterval(next, 5000);
+    return () => clearInterval(t);
+  }, [tour, selectedId]);
 
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
     const anim = !reducedMotion;
-    const room = selectedId ? roomById(selectedId) : null;
-    const zoom = room ? Math.max(officeFit * 2.4, 55) : fit;
+    const room = selectedId ? roomById(selectedId) : tour && tourTarget ? roomById(tourTarget) : null;
+    const zoom = room ? Math.max(officeFit * (selectedId ? 2.4 : 1.8), selectedId ? 55 : 40) : fit;
     if (room) void c.moveTo(room.x, 0.6, room.z, anim);
     else void c.moveTo(0, 0, 0, anim);
     void c.zoomTo(zoom, anim);
@@ -49,7 +88,7 @@ function CameraRig({ selectedId, panelOpen, reducedMotion }: Pick<OfficeProps, "
     const ox = panelOpen && wide ? PANEL_W / 2 / zoom : 0;
     const oy = panelOpen && !wide ? (size.height * 0.34) / zoom : 0;
     void c.setFocalOffset(ox, oy, 0, anim);
-  }, [selectedId, panelOpen, fit, officeFit, wide, size.height, reducedMotion]);
+  }, [selectedId, panelOpen, fit, officeFit, wide, size.height, reducedMotion, tour, tourTarget, resetAt]);
 
   return (
     <CameraControls
@@ -57,7 +96,7 @@ function CameraRig({ selectedId, panelOpen, reducedMotion }: Pick<OfficeProps, "
       makeDefault
       minZoom={fit * 0.6}
       maxZoom={160}
-      minPolarAngle={0.45}
+      minPolarAngle={view === "top" ? 0.02 : 0.45}
       maxPolarAngle={1.15}
       smoothTime={0.35}
     />
@@ -88,41 +127,58 @@ function Commons({ onOpenProjects }: { onOpenProjects: () => void }) {
       </Html>
 
       <StaticBatch>
-        {/* alas gedung putih dengan tepi abu-abu, lalu lantai dan koridor */}
-        <Box p={[0, -0.09, 0]} s={[FLOOR_HALF_X * 2 + 0.6, 0.06, FLOOR_HALF_Z * 2 + 0.6]} c="#BDC1C6" shadow={false} />
-        <Box p={[0, -0.05, 0]} s={[FLOOR_HALF_X * 2, 0.1, FLOOR_HALF_Z * 2]} c={MAT.concrete} shadow={false} />
-        <Box p={[0, 0.005, 0]} s={[FLOOR_HALF_X * 2 - 1, 0.02, CORRIDOR_HALF * 2]} c={MAT.corridor} shadow={false} />
-        {/* garis empat warna di sepanjang koridor */}
-        {BRAND.map((c, i) => (
-          <Box key={c} p={[0, 0.018, -0.45 + i * 0.3]} s={[FLOOR_HALF_X * 2 - 3, 0.01, 0.12]} c={c} shadow={false} />
-        ))}
-        {/* tiang sudut gedung berwarna */}
+        {/* lantai gedung: pelat putih hangat, koridor kayu ek dengan karpet panjang */}
+        <Box p={[0, -0.06, 0]} s={[FLOOR_HALF_X * 2 + 0.4, 0.12, FLOOR_HALF_Z * 2 + 0.4]} c={MAT.concrete} shadow={false} />
+        <Box p={[0, 0.005, 0]} s={[FLOOR_HALF_X * 2 - 1, 0.02, CORRIDOR_HALF * 2]} c={MAT.corridor} shadow={false} round={false} />
+        <Box p={[0, 0.02, 0]} s={[FLOOR_HALF_X * 2 - 6, 0.012, 0.9]} c={tint(TONES[4], 0.55)} shadow={false} round={false} />
+        {/* tanaman besar di empat sudut gedung */}
         {[
           [-1, -1],
           [1, -1],
           [-1, 1],
           [1, 1]
-        ].map(([sx, sz], i) => (
-          <Box key={`${sx}${sz}`} p={[sx * (FLOOR_HALF_X - 0.2), 0.9, sz * (FLOOR_HALF_Z - 0.2)]} s={[0.4, 1.8, 0.4]} c={brandAt(i)} />
+        ].map(([sx, sz]) => (
+          <BigPlant key={`${sx}${sz}`} p={[sx * (FLOOR_HALF_X - 0.5), 0, sz * (FLOOR_HALF_Z - 0.5)]} />
         ))}
+        {/* resepsionis: meja putih melengkung dengan panel pastel */}
         <group position={[-15.2, 0, 0.9]}>
-          <Box p={[0, 0.5, 0]} s={[0.7, 1.0, 2.2]} c="#FFFFFF" />
-          {BRAND.map((c, i) => (
-            <Box key={c} p={[0.36, 0.5, -0.825 + i * 0.55]} s={[0.02, 0.9, 0.55]} c={c} shadow={false} />
-          ))}
+          <Box p={[0, 0.5, 0]} s={[0.7, 1.0, 2.2]} c={MAT.wall} />
+          <Box p={[0.37, 0.45, 0]} s={[0.04, 0.7, 2.0]} c={TONES[0]} shadow={false} />
           <Box p={[0, 1.03, 0]} s={[0.8, 0.06, 2.3]} c={MAT.wood} />
-          <Box p={[-0.1, 1.2, -0.6]} s={[0.12, 0.28, 0.2]} c={MAT.screenOff} />
+          <Box p={[-0.1, 1.2, -0.6]} s={[0.14, 0.26, 0.2]} c={MAT.screenOff} />
+          <mesh position={[-0.1, 1.12, 0.6]} castShadow>
+            <sphereGeometry args={[0.12, 12, 8]} />
+            <meshStandardMaterial color={TONES[3]} roughness={0.6} />
+          </mesh>
         </group>
+        {/* pantry: konter putih, mesin kopi, kursi tinggi pastel */}
         <group position={[15.7, 0, -1.4]}>
           <Box p={[0, 0.45, 0]} s={[0.7, 0.9, 2.0]} c={MAT.wall} />
-          <Box p={[0, 0.92, 0]} s={[0.75, 0.05, 2.05]} c={MAT.woodDark} />
-          <Box p={[0, 1.15, -0.5]} s={[0.4, 0.42, 0.35]} c="#2B2B2B" />
-          <Box p={[0, 1.0, 0.3]} s={[0.12, 0.12, 0.12]} c="#F4EEDF" />
+          <Box p={[0, 0.92, 0]} s={[0.75, 0.05, 2.05]} c={MAT.wood} />
+          <Box p={[0, 1.15, -0.5]} s={[0.4, 0.42, 0.35]} c={MAT.screenOff} />
+          <Box p={[0, 1.0, 0.3]} s={[0.14, 0.14, 0.14]} c="#FFFFFF" />
+          {[-0.5, 0.3].map((z, i) => (
+            <group key={z} position={[-0.75, 0, z]}>
+              <Box p={[0, 0.3, 0]} s={[0.06, 0.6, 0.06]} c={MAT.metal} />
+              <mesh position={[0, 0.64, 0]} castShadow>
+                <cylinderGeometry args={[0.2, 0.2, 0.08, 16]} />
+                <meshStandardMaterial color={TONES[i + 1]} roughness={0.7} />
+              </mesh>
+            </group>
+          ))}
         </group>
+        {/* sofa pastel bersandaran bulat */}
         <group position={[15.6, 0, 1.6]}>
-          <Box p={[0, 0.25, 0]} s={[0.8, 0.5, 2.0]} c={BRAND[0]} />
-          <Box p={[0.3, 0.6, 0]} s={[0.2, 0.5, 2.0]} c="#3367D6" />
-          <Box p={[-1.0, 0.22, 0]} s={[0.6, 0.06, 0.9]} c={MAT.wood} />
+          <Box p={[0, 0.25, 0]} s={[0.8, 0.5, 2.0]} c={TONES[1]} />
+          <Box p={[0.3, 0.62, 0]} s={[0.22, 0.55, 2.0]} c={tint(TONES[1], 0.15)} />
+          {[-0.6, 0.6].map((z) => (
+            <Box key={z} p={[0.05, 0.6, z]} s={[0.2, 0.3, 0.4]} c={TONES[2]} />
+          ))}
+          <mesh position={[-1.0, 0.25, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.45, 0.45, 0.06, 20]} />
+            <meshStandardMaterial color={MAT.wood} roughness={0.7} />
+          </mesh>
+          <Box p={[-1.0, 0.12, 0]} s={[0.08, 0.24, 0.08]} c={MAT.metal} />
         </group>
       </StaticBatch>
     </group>
@@ -219,6 +275,7 @@ export default function OfficeCanvas(props: OfficeProps) {
       camera={{ position: [20, 22, 20], zoom: 30, near: 0.1, far: 400 }}
       gl={{ antialias: quality !== "high", alpha: false, powerPreference: "high-performance", stencil: false }}
       aria-label={`Kantor 3D ${houseName}`}
+      onPointerMissed={() => setFocus(null)}
     >
       <PerformanceMonitor
         bounds={() => [24, 50]}
@@ -231,11 +288,12 @@ export default function OfficeCanvas(props: OfficeProps) {
       <Atmosphere />
 
       {rooms.map((r, i) => (
-        <Room key={r.id} room={r} tone={brandAt(i)} selected={selectedId === r.id} onSelect={onSelect} onBoard={onOpenProjects} />
+        <Room key={r.id} room={r} tone={toneAt(i)} selected={selectedId === r.id} onSelect={onSelect} onBoard={onOpenProjects} />
       ))}
       {rooms.map((r) => (
         <Character key={r.id} id={r.id} reducedMotion={reducedMotion} onSelect={onSelect} />
       ))}
+      <FlowLayer />
       <Commons onOpenProjects={onOpenProjects} />
       <Campus />
 

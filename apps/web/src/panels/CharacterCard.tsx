@@ -6,7 +6,7 @@ import { fetchJson } from "../lib/api.ts";
 import { reloadDivisions } from "../state/store.ts";
 
 // Salinan keadaan simulasi, diperbarui berkala (simulasi berjalan di luar React).
-function useSim(id: string): SimState {
+export function useSim(id: string): SimState {
   const read = () => {
     const s = simOf(id);
     return { needs: { ...s.needs }, emotion: s.emotion, activity: s.activity };
@@ -23,7 +23,7 @@ function useSim(id: string): SimState {
 
 const tone = (v: number) => (v >= 60 ? "var(--ok)" : v >= 30 ? "var(--warn)" : "var(--danger)");
 
-function Bar({ label, value }: { label: string; value: number }) {
+export function Bar({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <div className="flex justify-between text-xs">

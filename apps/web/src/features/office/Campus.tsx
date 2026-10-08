@@ -4,13 +4,15 @@ import { useMemo, useRef } from "react";
 import { ExtrudeGeometry, type Mesh, type MeshStandardMaterial, Shape } from "three";
 import { atmo } from "./Atmosphere.tsx";
 import { CAMPUS_HALF_X, CAMPUS_HALF_Z, LEISURE, LIBRARY, PARK, PLAZA_Z, POOL, PROMENADE_Z, RING_X, WORSHIP, WORSHIP_Z } from "./layout.ts";
-import { BRAND, brandAt, MAT } from "./looks.ts";
+import { TONES, toneAt, MAT } from "./looks.ts";
 import { Monument } from "./Monument.tsx";
 import { StaticBatch } from "./StaticBatch.tsx";
 import { Box, type V3 } from "./parts.tsx";
 
-const GRASS = "#8DC67A";
-const PAVE = "#ECEEF0";
+const GRASS = "#BFDDA6";
+const GRASS_SIDE = "#8FB07A";
+const SOIL = "#C9B39A";
+const PAVE = "#F6F1E8";
 const GOLD = "#C9A227";
 
 function Sign({ p, text }: { p: V3; text: string }) {
@@ -49,12 +51,39 @@ function Cross({ p, c = "#3B2E24", s = 1 }: { p: V3; c?: string; s?: number }) {
   );
 }
 
+// Pohon low-poly ala maket: batang silinder dan tajuk bola bersegi. Bentuknya bergantian
+// (bulat atau cemara) menurut posisinya, supaya kampus tidak terlihat seragam.
 function Tree({ p, s = 1 }: { p: V3; s?: number }) {
+  const conifer = Math.abs(Math.round(p[0] * 7 + p[2] * 3)) % 3 === 0;
   return (
     <group position={p} scale={s}>
-      <Box p={[0, 0.7, 0]} s={[0.3, 1.4, 0.3]} c="#8D6E52" />
-      <Box p={[0, 1.8, 0]} s={[1.5, 1.2, 1.5]} c="#3E9B4F" />
-      <Box p={[0.1, 2.6, -0.05]} s={[1, 0.8, 1]} c="#5DB86A" />
+      <mesh position={[0, 0.6, 0]} castShadow>
+        <cylinderGeometry args={[0.12, 0.16, 1.2, 8]} />
+        <meshStandardMaterial color="#A58466" roughness={0.9} />
+      </mesh>
+      {conifer ? (
+        <>
+          <mesh position={[0, 1.7, 0]} castShadow>
+            <coneGeometry args={[0.95, 1.6, 7]} />
+            <meshStandardMaterial color="#6FAE7A" roughness={0.85} flatShading />
+          </mesh>
+          <mesh position={[0, 2.5, 0]} castShadow>
+            <coneGeometry args={[0.7, 1.2, 7]} />
+            <meshStandardMaterial color="#86C08F" roughness={0.85} flatShading />
+          </mesh>
+        </>
+      ) : (
+        <>
+          <mesh position={[0, 1.9, 0]} castShadow>
+            <icosahedronGeometry args={[0.95, 0]} />
+            <meshStandardMaterial color="#7DBB84" roughness={0.85} flatShading />
+          </mesh>
+          <mesh position={[0.35, 2.45, 0.15]} castShadow>
+            <icosahedronGeometry args={[0.55, 0]} />
+            <meshStandardMaterial color="#9ACD98" roughness={0.85} flatShading />
+          </mesh>
+        </>
+      )}
     </group>
   );
 }
@@ -130,7 +159,7 @@ function Volleyball({ p }: { p: V3 }) {
       <Box p={[0, 1.55, 0]} s={[0.03, 0.6, 4.6]} c="#F1F3F4" shadow={false} />
       <mesh position={[1.6, 0.15, 0.8]} castShadow>
         <sphereGeometry args={[0.15, 12, 8]} />
-        <meshStandardMaterial color={BRAND[2]} />
+        <meshStandardMaterial color={TONES[2]} />
       </mesh>
     </group>
   );
@@ -393,10 +422,10 @@ function Pool() {
   const loungers = LEISURE.filter((l) => l.key.startsWith("kursi-kolam"));
   return (
     <group>
-      <Box p={[x, 0.05, z]} s={[w + 4, 0.1, d + 4]} c="#E4DCCB" shadow={false} />
+      <Box p={[x, 0.05, z]} s={[w + 4, 0.1, d + 4]} c="#F2EDE4" shadow={false} />
       <mesh ref={water} position={[x, 0.13, z]} receiveShadow userData={{ dynamic: true }}>
         <boxGeometry args={[w, 0.04, d]} />
-        <meshStandardMaterial color="#5FA8C9" emissive="#2C6E8E" emissiveIntensity={0.25} roughness={0.15} />
+        <meshStandardMaterial color="#86CDE3" emissive="#3B8FB0" emissiveIntensity={0.25} roughness={0.12} />
       </mesh>
       {[
         [x, z - d / 2 - 0.1, w + 0.4, 0.2],
@@ -422,7 +451,7 @@ function Pool() {
         <Box p={[0, 1.1, 0]} s={[0.08, 2.2, 0.08]} c="#8A8A85" />
         <mesh position={[0, 2.2, 0]} castShadow>
           <coneGeometry args={[1.3, 0.6, 8]} />
-          <meshStandardMaterial color="#C8553D" />
+          <meshStandardMaterial color={TONES[1]} />
         </mesh>
       </group>
       <Sign p={[x, 1.2, z - d / 2 - 1.8]} text="Kolam Renang" />
@@ -478,19 +507,19 @@ function Park() {
     <group position={[x, 0, z]}>
       <mesh position={[0, 0.25, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[1.5, 1.6, 0.5, 20]} />
-        <meshStandardMaterial color="#B8AE9C" />
+        <meshStandardMaterial color="#E6E0D6" />
       </mesh>
       <mesh position={[0, 0.48, 0]}>
         <cylinderGeometry args={[1.3, 1.3, 0.06, 20]} />
-        <meshStandardMaterial color="#6FB3CF" emissive="#2C6E8E" emissiveIntensity={0.25} />
+        <meshStandardMaterial color="#8FD0E6" emissive="#3B8FB0" emissiveIntensity={0.25} />
       </mesh>
       <mesh position={[0, 1, 0]} castShadow>
         <cylinderGeometry args={[0.15, 0.2, 1.1, 10]} />
-        <meshStandardMaterial color="#B8AE9C" />
+        <meshStandardMaterial color="#E6E0D6" />
       </mesh>
       <mesh position={[0, 1.55, 0]}>
         <cylinderGeometry args={[0.55, 0.25, 0.2, 14]} />
-        <meshStandardMaterial color="#B8AE9C" />
+        <meshStandardMaterial color="#E6E0D6" />
       </mesh>
       <mesh ref={jet} position={[0, 1.9, 0]} userData={{ dynamic: true }}>
         <cylinderGeometry args={[0.06, 0.12, 0.7, 8]} />
@@ -501,10 +530,10 @@ function Park() {
       <Box p={[3.9, 0.36, 0]} s={[0.5, 0.12, 1.4]} c={MAT.wood} />
       <Box p={[0, 0.36, 3.9]} s={[1.4, 0.12, 0.5]} c={MAT.wood} />
       {[
-        [-2.5, -2.5, "#C8553D"],
-        [2.5, -2.5, "#E0A030"],
-        [-2.5, 2.5, "#B05C8E"],
-        [2.5, 2.5, "#E8D27A"]
+        [-2.5, -2.5, TONES[1]],
+        [2.5, -2.5, TONES[2]],
+        [-2.5, 2.5, TONES[4]],
+        [2.5, 2.5, TONES[5]]
       ].map(([fx, fz, c]) => (
         <Box key={`${fx}${fz}`} p={[fx as number, 0.15, fz as number]} s={[1.2, 0.3, 1.2]} c={c as string} />
       ))}
@@ -524,7 +553,10 @@ const TREES: [number, number, number][] = [
 export function Campus() {
   return (
     <StaticBatch>
+      {/* alas maket yang melayang: lapisan rumput, lapisan tanah, dan sisi yang lebih gelap */}
       <Box p={[0, -0.12, 0]} s={[CAMPUS_HALF_X * 2, 0.1, CAMPUS_HALF_Z * 2]} c={GRASS} shadow={false} />
+      <Box p={[0, -0.42, 0]} s={[CAMPUS_HALF_X * 2 + 0.02, 0.5, CAMPUS_HALF_Z * 2 + 0.02]} c={GRASS_SIDE} shadow={false} />
+      <Box p={[0, -1.3, 0]} s={[CAMPUS_HALF_X * 2 - 0.2, 1.3, CAMPUS_HALF_Z * 2 - 0.2]} c={SOIL} shadow={false} />
       {/* jalan setapak */}
       <Box p={[0, -0.05, PROMENADE_Z]} s={[84, 0.04, 1.8]} c={PAVE} shadow={false} />
       <Box p={[0, -0.05, PLAZA_Z]} s={[84, 0.04, 1.8]} c={PAVE} shadow={false} />
@@ -557,7 +589,7 @@ export function Campus() {
       <Park />
       {/* rak sepeda di depan gedung: dua deretan, warna bergantian */}
       {[...Array.from({ length: 9 }, (_, i) => -14.5 + i * 0.7), ...Array.from({ length: 9 }, (_, i) => 8 + i * 0.7)].map((x, i) => (
-        <Bike key={x} p={[x, 0, PROMENADE_Z + 1.7]} c={brandAt(i)} />
+        <Bike key={x} p={[x, 0, PROMENADE_Z + 1.7]} c={toneAt(i)} />
       ))}
       {/* kafe luar ruangan antara taman baca dan taman */}
       {[
@@ -566,11 +598,11 @@ export function Campus() {
         [11, 21.5],
         [15.5, 21.5]
       ].map(([x, z], i) => (
-        <CafeTable key={`${x}${z}`} p={[x, 0, z]} c={brandAt(i)} />
+        <CafeTable key={`${x}${z}`} p={[x, 0, z]} c={toneAt(i)} />
       ))}
       <Volleyball p={[0, 0, -9]} />
       {[-14, -12.6, -11.2, 11.2, 12.6, 14].map((x, i) => (
-        <LawnChair key={x} p={[x, 0, -8.4]} c={brandAt(i)} ry={Math.PI} />
+        <LawnChair key={x} p={[x, 0, -8.4]} c={toneAt(i)} ry={Math.PI} />
       ))}
       {/* tugu di pojok tenggara kampus, menghadap arah kamera bawaan */}
       <Monument position={[38, 0, 25]} rotation={Math.PI / 4} />
