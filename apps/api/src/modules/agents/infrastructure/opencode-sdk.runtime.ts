@@ -27,11 +27,16 @@ export class OpenCodeSdkRuntime implements AgentRuntime {
     await this.connect();
     writeWorkspaceConfig(input.workspacePath, input.model);
     const [providerID, ...rest] = input.model.split("/");
-    const session = await this.api<{ id: string }>("POST", "/api/session", {
-      location: { directory: input.workspacePath },
-      agent: "build",
-      ...(rest.length ? { model: { providerID, id: rest.join("/") } } : {})
-    });
+    const create = (agent: string) =>
+      this.api<{ id: string }>("POST", "/api/session", {
+        location: { directory: input.workspacePath },
+        agent,
+        ...(rest.length ? { model: { providerID, id: rest.join("/") } } : {})
+      });
+    // Agen "house" (prompt dan alat ramping, lihat house/opencode/opencode.json) jauh lebih hemat token.
+    // Bila OpenCode dijalankan tanpa konfigurasi House, pakai agen bawaan "build".
+    const agent = process.env.OPENCODE_AGENT || "house";
+    const session = await create(agent).catch((e: Error) => (agent !== "build" ? create("build") : Promise.reject(e)));
     this.sessionOf.set(input.runId, session.id);
     this.runOf.set(session.id, input.runId);
     await this.api("POST", `/api/session/${session.id}/prompt`, {
@@ -223,16 +228,17 @@ export class OpenCodeSdkRuntime implements AgentRuntime {
 export function writeWorkspaceConfig(workspace: string, model: string) {
   const [providerID, ...rest] = model.split("/");
   const id = rest.join("/");
-  const actions = ["*", "shell", "edit", "read", "glob", "grep", "list", "webfetch", "websearch", "external_directory", "skill", "task"];
+  // Satu aturan "*" cukup: semua aksi lewat penilaian House. Aturan per aksi justru bisa menimpa
+  // larangan alat di agen "house" dan membuat alat berat (web, sub-agen, skill) muncul lagi.
+  const actions = ["*"];
   const config = {
     $schema: "https://opencode.ai/config.json",
     ...(providerID === "9router" && id
       ? {
           providers: {
             "9router": {
+              // alamat dan kunci 9router diambil dari konfigurasi OpenCode House (variabel lingkungan)
               package: "@opencode/ai/providers/openai-compatible",
-              env: ["NINEROUTER_API_KEY"],
-              settings: { baseURL: process.env.NINEROUTER_BASE_URL || "http://127.0.0.1:20128/v1" },
               models: { [id]: { modelID: id } }
             }
           }

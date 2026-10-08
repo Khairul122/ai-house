@@ -40,7 +40,16 @@ if (-not $env:OPENCODE_SERVER_PASSWORD) { throw "OPENCODE_SERVER_PASSWORD di .en
 if (Test-Port 20128) { Write-Host "9router sudah berjalan." }
 else { Write-Host "Menyalakan 9router..."; Start-Hidden "9router" "9router -n --skip-update" $Root; Wait-Port 20128 "9router" }
 
-# 2. OpenCode khusus House
+# 2. OpenCode khusus House, memakai konfigurasi House sendiri (agen "house" yang ramping) dan tanpa
+#    tambahan dari konfigurasi global/Claude Code (MCP, skill, instruksi) agar token per langkah kecil.
+$env:OPENCODE_CONFIG_DIR = Join-Path $Root "house\opencode"
+$env:OPENCODE_DISABLE_CLAUDE_CODE = "1"
+$env:OPENCODE_DISABLE_CLAUDE_CODE_PROMPT = "1"
+$env:OPENCODE_DISABLE_CLAUDE_CODE_SKILLS = "1"
+$env:OPENCODE_DISABLE_EXTERNAL_SKILLS = "1"
+$env:OPENCODE_DISABLE_DEFAULT_PLUGINS = "1"
+$env:OPENCODE_DISABLE_AUTOUPDATE = "1"
+if (-not $env:NINEROUTER_BASE_URL) { $env:NINEROUTER_BASE_URL = "http://127.0.0.1:20128/v1" }
 $ocPort = ([Uri]$env:OPENCODE_SERVER_URL).Port
 $workspaces = Join-Path $Api "workspaces"
 New-Item -ItemType Directory -Force $workspaces | Out-Null

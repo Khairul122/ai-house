@@ -46,6 +46,7 @@ export function assessPermission(
     case "skill":
       return allow(0, "Memuat panduan skill (hanya instruksi).");
     case "task":
+    case "subagent": // nama aksi sub-agen di OpenCode v2
       // Sub-agen berjalan di session anak yang izinnya tidak terlihat House; agen harus bekerja langsung.
       return deny("Sub-agen tidak diizinkan di House. Kerjakan langsung.");
     default:

@@ -93,13 +93,13 @@ describe("OpenCodeSdkRuntime", () => {
       { type: "done", summary: "Halaman selesai dibuat." }
     ]);
     const create = JSON.parse(seen.find((s) => s.url === "/api/session" && s.method === "POST")!.body);
-    expect(create).toEqual({ location: { directory: ws }, agent: "build", model: { providerID: "9router", id: "default-model" } });
+    expect(create).toEqual({ location: { directory: ws }, agent: "house", model: { providerID: "9router", id: "default-model" } });
 
     // workspace mendapat konfigurasi: model terdaftar, semua aksi "ask"
     const cfg = JSON.parse(fs.readFileSync(path.join(ws, "opencode.json"), "utf-8"));
     expect(cfg.providers["9router"].models).toEqual({ "default-model": { modelID: "default-model" } });
     expect(cfg.permissions.every((r: { effect: string }) => r.effect === "ask")).toBe(true);
-    expect(cfg.permissions.map((r: { action: string }) => r.action)).toContain("shell");
+    expect(cfg.permissions).toEqual([{ action: "*", resource: "*", effect: "ask" }]);
     fs.rmSync(ws, { recursive: true, force: true });
     expect(JSON.parse(seen.find((s) => s.url.endsWith("/reply"))!.body)).toEqual({ decision: "once" });
     expect(seen.some((x) => x.url === "/api/session/ses_1/question/que_1/reject" && x.method === "POST")).toBe(true);
