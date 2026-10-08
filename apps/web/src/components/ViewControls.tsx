@@ -1,5 +1,6 @@
 import {
   Box,
+  Layers,
   LayoutGrid,
   LocateFixed,
   Pause,
@@ -8,6 +9,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { type CameraView, camera, useCamera } from "../state/camera.ts";
+import { useFloors } from "../state/store.ts";
 
 const VIEWS: [CameraView, string, typeof Box][] = [
   ["iso", "Isometrik", Box],
@@ -20,6 +22,8 @@ export function ViewControls() {
   const navigate = useNavigate();
   const view = useCamera((c) => c.view);
   const tour = useCamera((c) => c.tour);
+  const floor = useCamera((c) => c.floor);
+  const floors = useFloors();
 
   return (
     <div className="view-controls glass" role="toolbar" aria-label="Kamera">
@@ -36,6 +40,34 @@ export function ViewControls() {
           <Icon className="w-4 h-4" aria-hidden />
         </button>
       ))}
+      {floors.length > 1 && (
+        <>
+          <span className="view-sep" aria-hidden />
+          <button
+            type="button"
+            className={`view-btn${floor === null ? " is-on" : ""}`}
+            onClick={() => camera.setFloor(null)}
+            aria-pressed={floor === null}
+            title="Semua lantai"
+            aria-label="Semua lantai"
+          >
+            <Layers className="w-4 h-4" aria-hidden />
+          </button>
+          {floors.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              className={`view-btn view-floor${floor === f.level ? " is-on" : ""}`}
+              onClick={() => camera.setFloor(f.level)}
+              aria-pressed={floor === f.level}
+              title={`Lantai ${f.level + 1}: ${f.name}`}
+              aria-label={`Lantai ${f.level + 1}: ${f.name}`}
+            >
+              {f.level + 1}
+            </button>
+          ))}
+        </>
+      )}
       <span className="view-sep" aria-hidden />
       <button
         type="button"

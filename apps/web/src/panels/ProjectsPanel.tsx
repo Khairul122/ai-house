@@ -1,16 +1,18 @@
-import React, { useId, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useEffect, useId, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ErrorNote, Loading, PanelShell } from "../components/PanelShell.tsx";
 import { lookOf, useCoordinatorLabel } from "../features/office/looks.ts";
 import { postJson, timeAgo, useFetch } from "../lib/hooks.ts";
 import { useAutonomy } from "../state/autonomy.ts";
-import { useCoordinatorId, useDivisions, useOffice } from "../state/store.ts";
+import { useCoordinatorId, useDivisions, useFloors, useOffice } from "../state/store.ts";
 
 interface Project {
   id: string;
   title: string;
   goal: string;
   status: string;
+  floorId: string | null;
+  kind: string;
   createdAt: string;
 }
 
@@ -56,9 +58,21 @@ const EMPTY: Form = { title: "", goal: "", audience: "", scope: "", constraints:
 
 function NewProjectForm() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const floors = useFloors();
+  const [floorId, setFloorId] = useState(params.get("floor") ?? "");
+  // datang dari panel lantai ("Beri proyek") saat formulir sudah terbuka
+  useEffect(() => {
+    const f = params.get("floor");
+    if (f !== null) setFloorId(f);
+  }, [params]);
+  const floor = floors.find((f) => f.id === floorId);
+  const all = useDivisions();
   const coordinator = useCoordinatorId();
-  const lead = useCoordinatorLabel();
-  const divisions = useDivisions().filter((d) => d.id !== coordinator);
+  // proyek satu bidang direncanakan ketua bidangnya (bila ada), selain itu koordinator utama
+  const planner = (floor && all.find((d) => d.floor === floor.id && d.role === "coordinator")?.id) || coordinator;
+  const lead = planner ? lookOf(planner).short : "Koordinator";
+  const divisions = all.filter((d) => d.id !== planner && (!floor || d.floor === floor.id));
   const mode = useAutonomy();
   const [form, setForm] = useState<Form>(EMPTY);
   const [picked, setPicked] = useState<string[]>([]);
@@ -99,7 +113,8 @@ function NewProjectForm() {
       const encoded = await Promise.all(files.map(async (f) => ({ name: f.name, contentBase64: await toBase64(f) })));
       const body = {
         ...Object.fromEntries(Object.entries(form).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v]).filter(([, v]) => v !== "")),
-        divisions: picked.length ? picked : undefined,
+        floor: floor?.id,
+        divisions: picked.some((id) => divisions.some((d) => d.id === id)) ? picked.filter((id) => divisions.some((d) => d.id === id)) : undefined,
         files: encoded.length ? encoded : undefined
       };
       const p = await postJson<Project>("/api/projects", body);
@@ -121,6 +136,20 @@ function NewProjectForm() {
         <span>Tujuan *</span>
         <textarea value={form.goal} onChange={set("goal")} rows={3} maxLength={4000} placeholder="Apa yang harus jadi dan untuk apa" />
       </label>
+
+      {floors.length > 1 && (
+        <label className="field">
+          <span>Ditujukan untuk</span>
+          <select value={floorId} onChange={(e) => setFloorId(e.target.value)}>
+            <option value="">Seluruh gedung (semua bidang)</option>
+            {floors.map((f) => (
+              <option key={f.id} value={f.id} disabled={!f.divisionIds.length}>
+                Lantai {f.level + 1}: {f.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <fieldset className="form-group">
         <legend>Detail kebutuhan (opsional, makin lengkap makin tepat)</legend>
@@ -223,9 +252,10 @@ export function ProjectsPanel() {
   const lead = useCoordinatorLabel();
   const version = useOffice((s) => s.version);
   const { data, error } = useFetch<Project[]>("/api/projects", version);
+  const floors = useFloors();
 
   return (
-    <PanelShell title="Proyek" subtitle={`Tulis permintaan Anda di resepsionis. ${lead} yang akan membaginya.`}>
+    <PanelShell title="Proyek" subtitle={`Tulis permintaan Anda di resepsionis. ${lead} membagi proyek seluruh gedung; proyek satu bidang dibagi ketua bidangnya.`}>
       <NewProjectForm />
 
       <h3 className="text-sm font-semibold text-ink mb-1">Semua proyek</h3>
@@ -238,6 +268,12 @@ export function ProjectsPanel() {
             <Link to={`/projects/${p.id}`} className="py-3 px-1 flex items-start justify-between gap-3 hover:bg-line/20">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-ink">{p.title}</p>
+                {(p.floorId || p.kind === "meeting") && (
+                  <p className="text-xs text-ink-muted">
+                    {p.kind === "meeting" ? "Rapat · " : ""}
+                    {floors.find((f) => f.id === p.floorId)?.name ?? "Seluruh gedung"}
+                  </p>
+                )}
                 <p className="text-sm text-ink-muted line-clamp-2">{p.goal}</p>
               </div>
               <div className="text-right shrink-0">

@@ -13,6 +13,7 @@ permission:
   webfetch: allow
 religion: islam
 order: 8
+floor: software
 persona:
   name: "Fajar Nugraha"
   short: "DevOps"

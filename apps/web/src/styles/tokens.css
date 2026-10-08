@@ -84,6 +84,9 @@ kbd {
   transition: background 0.2s, color 0.2s, transform 0.2s var(--ease);
 }
 .room-sign.is-selected { background: #202124; color: #FFFFFF; transform: scale(1.08); }
+.floor-sign { font-size: 11px; background: #FFFDF8; }
+.meeting-sign.is-live { color: #FFFFFF; background: #3B6FD8; animation: pulse 1.6s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .meeting-sign.is-live { animation: none; } }
 .speech {
   max-width: 150px; font-size: 11px; line-height: 1.25; color: #1B1A17;
   background: #FFFFFF; border: 1px solid #DAD6CC; border-radius: 8px;
@@ -479,6 +482,8 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 .minimap-room rect { transition: fill 0.2s, stroke 0.2s; }
 .minimap-room:hover rect, .minimap-room:focus-visible rect { fill: var(--surface); }
 .minimap-label { font-size: 1.15px; font-weight: 700; fill: #202124; pointer-events: none; }
+.minimap-floor-label { font-size: 0.9px; fill: #5F6368; }
+.view-floor { min-width: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .minimap-pulse { animation: blink 1.2s ease-in-out infinite; }
 @media (max-width: 999px) { .minimap { display: none; } }
 @media (min-width: 1000px) { .roster { max-height: calc(100vh - 156px - 128px); } }

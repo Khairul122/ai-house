@@ -6,14 +6,14 @@ import type { AgentStatus } from "../../state/reduce.ts";
 import { STATUS_LABEL } from "../../panels/DivisionsPanel.tsx";
 import { useDivisionName } from "../../state/store.ts";
 import { useAgentStatus } from "../../state/useAgentStatus.ts";
-import { ROOM_D, ROOM_W, type RoomDef, WALL_H } from "./layout.ts";
+import { FLOOR_H, ROOM_D, ROOM_W, type RoomDef, WALL_H } from "./layout.ts";
 import { lookOf, MAT, type Signature as SignatureKind, tint, useLook } from "./looks.ts";
 import { Box, type V3 } from "./parts.tsx";
 import { BeanBag, BigPlant, glassMaterial, RoundRug } from "./props.tsx";
 import { StaticBatch } from "./StaticBatch.tsx";
 
 // Properti khas yang tidak bergantung status dan tidak bisa diklik (boleh digabung).
-const STATIC_SIGNATURE = new Set<SignatureKind>(["easel", "checklist", "screens", "chart", "books", "rack"]);
+const STATIC_SIGNATURE = new Set<SignatureKind>(["easel", "checklist", "screens", "chart", "books", "rack", "mic", "typewriter", "poster"]);
 
 const HW = ROOM_W / 2;
 const HD = ROOM_D / 2;
@@ -30,7 +30,7 @@ const SCREEN: Record<AgentStatus, [string, number]> = {
 
 // Dinding belakang yang padat. Saat menghadap kamera ia turun rendah (gaya potongan rumah boneka)
 // agar isi ruangan terlihat. `accent`: panel warna di muka dalam dinding, ikut turun bersamanya.
-function Wall({ p, s, n, accent, lamp }: { p: V3; s: V3; n: [number, number]; accent?: string; lamp?: string | null }) {
+export function Wall({ p, s, n, accent, lamp }: { p: V3; s: V3; n: [number, number]; accent?: string; lamp?: string | null }) {
   const ref = useRef<Mesh>(null);
   const dir = useMemo(() => new Vector3(), []);
   useFrame(({ camera }) => {
@@ -54,7 +54,7 @@ function Wall({ p, s, n, accent, lamp }: { p: V3; s: V3; n: [number, number]; ac
 
 // Dinding kaca dengan bingkai putih tipis di atas dan bawah serta tiang di kedua ujung.
 // Panjang panel searah sumbu x lokal; dirotasi untuk dinding samping.
-function Glass({ p, len, ry = 0 }: { p: V3; len: number; ry?: number }) {
+export function Glass({ p, len, ry = 0 }: { p: V3; len: number; ry?: number }) {
   return (
     <group position={p} rotation={[0, ry, 0]}>
       <mesh material={glassMaterial} position={[0, WALL_H / 2, 0]}>
@@ -186,6 +186,83 @@ function Signature({ id, status, onBoard }: { id: string; status: AgentStatus; o
           <Box p={[0.5, 0.03, 0.3]} s={[0.7, 0.04, 0.05]} c="#3D6B8C" shadow={false} />
         </group>
       );
+    case "mic":
+      // studio audio: panel peredam warna-warni di dinding, mikrofon di lengan, monitor speaker
+      return (
+        <group>
+          {[-0.45, 0, 0.45].map((x, i) =>
+            [1.25, 0.8].map((y, j) => (
+              <Box key={`${x}${y}`} p={[-1.1 + x, y, -HD + 0.1]} s={[0.4, 0.4, 0.08]} c={(i + j) % 2 ? accent : "#3A3440"} shadow={false} />
+            ))
+          )}
+          <Box p={[0.45, 0.95, -0.35]} s={[0.03, 0.4, 0.03]} c={MAT.metal} shadow={false} />
+          <Box p={[0.45, 1.15, -0.25]} s={[0.09, 0.16, 0.09]} c="#2A2A2A" shadow={false} />
+          {[-0.65, 0.65].map((x) => (
+            <Box key={x} p={[x, 0.9, -0.42]} s={[0.18, 0.28, 0.18]} c="#2E2B33" shadow={false} />
+          ))}
+        </group>
+      );
+    case "typewriter":
+      // meja penulis: mesin tik, tumpukan kertas, rak buku rendah
+      return (
+        <group>
+          <Box p={[0.45, 0.82, -0.25]} s={[0.42, 0.14, 0.32]} c={accent} />
+          <Box p={[0.45, 0.93, -0.36]} s={[0.36, 0.1, 0.03]} c="#FBF7EE" shadow={false} />
+          {[0, 1, 2].map((i) => (
+            <Box key={i} p={[-0.5, 0.77 + i * 0.03, -0.25]} s={[0.3, 0.02, 0.4]} c="#FBF7EE" shadow={false} />
+          ))}
+          <group position={[-1.6, 0, -1.4]}>
+            <Box p={[0, 0.45, 0]} s={[0.9, 0.9, 0.4]} c={MAT.woodDark} />
+            {["#7A3B1E", "#3D6B8C", "#C9A227", "#556B5E"].map((c, i) => (
+              <Box key={c} p={[-0.3 + i * 0.2, 0.65, 0.12]} s={[0.12, 0.3, 0.2]} c={c} shadow={false} />
+            ))}
+          </group>
+        </group>
+      );
+    case "poster":
+      // studio desain grafis: dinding poster berbingkai dan tablet gambar di meja
+      return (
+        <group>
+          {(
+            [
+              [-1.45, 1.1, 0.5, 0.7, accent],
+              [-0.85, 1.2, 0.45, 0.5, "#F2C14E"],
+              [-0.85, 0.75, 0.45, 0.3, "#2A9D8F"]
+            ] as const
+          ).map(([x, y, w, h, c]) => (
+            <group key={`${x}${y}`} position={[x, y, -HD + 0.1]}>
+              <Box p={[0, 0, 0]} s={[w + 0.06, h + 0.06, 0.03]} c="#2A2A2A" shadow={false} />
+              <Box p={[0, 0, 0.02]} s={[w, h, 0.02]} c={c} shadow={false} />
+            </group>
+          ))}
+          <Box p={[0.5, 0.77, -0.15]} s={[0.4, 0.02, 0.28]} c="#2A2D34" shadow={false} />
+          <Box p={[0.62, 0.79, -0.08]} s={[0.02, 0.02, 0.18]} c={accent} shadow={false} />
+        </group>
+      );
+    case "phone": {
+      // studio sosial media: ring light dengan ponsel, papan grid feed
+      const live = status === "working";
+      return (
+        <group>
+          <group position={[-1.1, 0, -HD + 0.1]}>
+            <Box p={[0, 1.05, 0]} s={[1.2, 1.2, 0.05]} c="#FAFAF7" />
+            {[-0.36, 0, 0.36].map((x, i) =>
+              [0.36, 0, -0.36].map((y, j) => (
+                <Box key={`${x}${y}`} p={[x, 1.05 + y, 0.04]} s={[0.3, 0.3, 0.02]} c={["#F2C14E", accent, "#E07A5F", "#8E7DBE"][(i + j * 3) % 4]} shadow={false} />
+              ))
+            )}
+          </group>
+          <group position={[1.35, 0, -0.9]}>
+            <Box p={[0, 0.6, 0]} s={[0.04, 1.2, 0.04]} c={MAT.metal} shadow={false} />
+            <mesh position={[0, 1.3, 0]} rotation={[0, 0.6, 0]} castShadow>
+              <torusGeometry args={[0.24, 0.04, 8, 24]} />
+              <meshStandardMaterial color="#FFF4E0" emissive="#FFE7C2" emissiveIntensity={live ? 1.1 : 0.15} />
+            </mesh>
+            <Box p={[0, 1.3, 0]} s={[0.1, 0.18, 0.02]} c="#1E1E22" rotation={[0, 0.6, 0]} shadow={false} />
+          </group>
+        </group>
+      );
+    }
     default:
       return null;
   }
@@ -197,9 +274,10 @@ interface RoomProps {
   onSelect: (id: string) => void;
   onBoard: () => void;
   tone: string; // warna aksen ruangan dari palet kampus
+  signs: boolean; // papan nama hanya di lantai yang sedang dilihat
 }
 
-export function Room({ room, selected, onSelect, onBoard, tone }: RoomProps) {
+export function Room({ room, selected, onSelect, onBoard, tone, signs }: RoomProps) {
   const { status, agent } = useAgentStatus(room.id);
   const nameOf = useDivisionName();
   const [hover, setHover] = useState(false);
@@ -214,7 +292,7 @@ export function Room({ room, selected, onSelect, onBoard, tone }: RoomProps) {
   };
 
   return (
-    <group position={[room.x, 0, room.z]} scale={[room.w / ROOM_W, 1, 1]}>
+    <group position={[room.x, room.level * FLOOR_H, room.z]} scale={[room.w / ROOM_W, 1, 1]}>
       {/* Area klik: satu kotak tak terlihat seluas lantai, bukan ratusan mesh ruangan. */}
       <mesh
         visible={false}
@@ -276,20 +354,22 @@ export function Room({ room, selected, onSelect, onBoard, tone }: RoomProps) {
         {/* properti yang berubah sesuai status atau bisa diklik tetap terpisah */}
         {!fixed && <Signature id={room.id} status={status} onBoard={handleBoard} />}
 
-        <Html position={[0, WALL_H + 0.25, HD]} center zIndexRange={[10, 0]} pointerEvents="none">
-          <div className={`room-sign${selected ? " is-selected" : ""}`} style={{ borderColor: tone }}>
-            {look.short}
-          </div>
-          {/* kartu singkat saat kursor di atas ruangan: nama divisi, status, dan tugasnya */}
-          {hover && !selected && (
-            <div className="room-peek">
-              <strong>{nameOf(room.id)}</strong>
-              <span className={`tag tag-${status}`}>{STATUS_LABEL[status]}</span>
-              {agent?.task && status !== "idle" && <span className="room-peek-task">{agent.task.title}</span>}
-              <span className="room-peek-hint">Klik untuk mendekat</span>
+        {(signs || selected) && (
+          <Html position={[0, WALL_H + 0.25, HD]} center zIndexRange={[10, 0]} pointerEvents="none">
+            <div className={`room-sign${selected ? " is-selected" : ""}`} style={{ borderColor: tone }}>
+              {look.short}
             </div>
-          )}
-        </Html>
+            {/* kartu singkat saat kursor di atas ruangan: nama divisi, status, dan tugasnya */}
+            {hover && !selected && (
+              <div className="room-peek">
+                <strong>{nameOf(room.id)}</strong>
+                <span className={`tag tag-${status}`}>{STATUS_LABEL[status]}</span>
+                {agent?.task && status !== "idle" && <span className="room-peek-task">{agent.task.title}</span>}
+                <span className="room-peek-hint">Klik untuk mendekat</span>
+              </div>
+            )}
+          </Html>
+        )}
       </group>
     </group>
   );

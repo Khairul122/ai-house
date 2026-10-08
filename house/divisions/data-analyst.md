@@ -13,6 +13,7 @@ permission:
   webfetch: allow
 religion: protestan
 order: 6
+floor: data-security
 persona:
   name: "Debora Wijaya"
   short: "Data"

@@ -20,7 +20,8 @@ export const BriefInputSchema = z.object({
   constraints: text(2000),
   style: text(1500),
   priority: z.enum(["normal", "tinggi", "mendesak"]).optional(),
-  divisions: z.array(z.string().max(64)).max(20).optional(),
+  floor: z.string().max(64).optional(), // id lantai (bidang); kosong = seluruh gedung
+  divisions: z.array(z.string().max(64)).max(30).optional(),
   notes: text(4000),
   tokenBudget: z.number().int().positive().optional(),
   files: z
@@ -70,7 +71,7 @@ export function decodeFiles(files: BriefInput["files"]): DecodedFile[] {
 const PRIORITY: Record<string, string> = { normal: "Normal", tinggi: "Tinggi", mendesak: "Mendesak" };
 const kb = (n: number) => (n < 1024 ? `${n} B` : `${Math.round(n / 1024)} KB`);
 
-export function composeBrief(input: BriefInput, files: DecodedFile[], divisionName: (id: string) => string): string {
+export function composeBrief(input: BriefInput, files: DecodedFile[], divisionName: (id: string) => string, floorName?: string): string {
   const section = (title: string, body?: string) => (body?.trim() ? `\n## ${title}\n${body.trim()}\n` : "");
   return [
     `# Brief proyek: ${input.title}\n`,
@@ -80,6 +81,7 @@ export function composeBrief(input: BriefInput, files: DecodedFile[], divisionNa
     section("Teknologi dan batasan", input.constraints),
     section("Gaya dan nuansa", input.style),
     section("Prioritas", input.priority ? PRIORITY[input.priority] : undefined),
+    section("Bidang (lantai)", floorName ? `${floorName}. Hanya divisi di bidang ini yang mengerjakan proyek.` : undefined),
     section("Divisi yang dilibatkan", input.divisions?.length ? input.divisions.map((d) => `- ${divisionName(d)} (${d})`).join("\n") : undefined),
     section("Catatan tambahan", input.notes),
     section("Berkas pendukung", files.length ? files.map((f) => `- brief/${f.name} (${kb(f.data.length)})`).join("\n") : undefined)

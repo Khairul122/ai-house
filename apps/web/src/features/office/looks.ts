@@ -24,8 +24,24 @@ export interface Look {
 }
 
 const ACCESSORIES: Accessory[] = ["hardhat", "glasses", "hood", "beret", "headphones", "tie", "cap", "bun", "visor", "scarf"];
-export type Signature = "board" | "monitor" | "easel" | "server" | "checklist" | "screens" | "chart" | "camera" | "books" | "rack";
-const SIGNATURES: Signature[] = ["board", "monitor", "easel", "server", "checklist", "screens", "chart", "camera", "books", "rack"];
+export type Signature =
+  | "board"
+  | "monitor"
+  | "easel"
+  | "server"
+  | "checklist"
+  | "screens"
+  | "chart"
+  | "camera"
+  | "books"
+  | "rack"
+  | "mic"
+  | "typewriter"
+  | "phone"
+  | "poster";
+// Properti yang boleh dipilih otomatis untuk divisi tanpa persona (urutan lama dipertahankan agar tampilan tidak berubah).
+const AUTO_SIGNATURES: Signature[] = ["board", "monitor", "easel", "server", "checklist", "screens", "chart", "camera", "books", "rack"];
+const SIGNATURES: Signature[] = [...AUTO_SIGNATURES, "mic", "typewriter", "phone", "poster"];
 const SHIRTS = ["#3F4A5A", "#4A5A3F", "#5B4A3A", "#6B7B83", "#2E2F33", "#7A5C46", "#C9A27A", "#556B5E", "#45505C", "#EADFCB"];
 const HAIRS = ["#1C1A17", "#2B1E16", "#3A2A1C", "#4A3826", "#5A3A22", "#7A3B1E", "#121212", "#8C8C88"];
 const SKINS = ["#F2D0B0", "#F0C9A4", "#EBC7A2", "#E8BE98", "#E2B48C", "#D6A47C", "#C98E64", "#C48A60", "#B57C55", "#9C6B48"];
@@ -62,7 +78,7 @@ export function lookOf(id: string): FullLook {
     skin: p.skin || pick(SKINS, id, "skin"),
     accent: p.accent || pick(ACCENTS, id, "accent"),
     accessory: oneOf(ACCESSORIES, p.accessory) ?? pick(ACCESSORIES, id, "accessory"),
-    signature: oneOf(SIGNATURES, p.signature) ?? pick(SIGNATURES, id, "signature"),
+    signature: oneOf(SIGNATURES, p.signature) ?? pick(AUTO_SIGNATURES, id, "signature"),
     smallTalk: p.smallTalk ?? []
   };
   cache.set(id, { src: division, look });

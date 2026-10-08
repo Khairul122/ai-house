@@ -42,7 +42,22 @@ export const DivisionRoleSchema = z.enum(["coordinator", "member"]);
 export const AccessorySchema = z.enum(["hardhat", "glasses", "hood", "beret", "headphones", "tie", "cap", "bun", "visor", "scarf"]);
 
 // Jenis properti khas di ruangan divisi pada kantor 3D.
-export const RoomSignatureSchema = z.enum(["board", "monitor", "easel", "server", "checklist", "screens", "chart", "camera", "books", "rack"]);
+export const RoomSignatureSchema = z.enum([
+  "board",
+  "monitor",
+  "easel",
+  "server",
+  "checklist",
+  "screens",
+  "chart",
+  "camera",
+  "books",
+  "rack",
+  "mic",
+  "typewriter",
+  "phone",
+  "poster"
+]);
 
 const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
@@ -67,6 +82,10 @@ export const DivisionConfigSchema = z.object({
   model: z.string(),
   // "coordinator" menyusun rencana dan membagi tugas; tepat satu divisi sebaiknya memegang peran ini
   role: DivisionRoleSchema.default("member"),
+  // lantai (bidang) tempat ruangan divisi, id dari house/floors.yaml; kosong = lantai pertama
+  floor: z.string().optional(),
+  // boleh mengajukan unggahan ke akun sosial media terdaftar (lewat berkas publikasi/*.json)
+  publish: z.boolean().default(false),
   // urutan ruangan di kantor 3D dan daftar divisi (kecil di depan)
   order: z.coerce.number().default(100),
   // agama karakter divisi di kantor 3D (menentukan tempat dan waktu ibadahnya)
@@ -97,6 +116,12 @@ export const ProjectPlanSchema = z.object({
   title: z.string(),
   goal: z.string(),
   tasks: z.array(PlanTaskItemSchema)
+});
+
+export const FloorSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/),
+  name: z.string(),
+  description: z.string().default("")
 });
 
 export const CreateProjectInputSchema = z.object({

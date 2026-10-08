@@ -38,7 +38,7 @@ interface WorkFile {
 }
 
 const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
-const fileUrl = (projectId: string, p: string) => `/api/projects/${projectId}/files/${p.split("/").map(encodeURIComponent).join("/")}`;
+export const fileUrl = (projectId: string, p: string) => `/api/projects/${projectId}/files/${p.split("/").map(encodeURIComponent).join("/")}`;
 
 // Berkas yang dibuat divisi di workspace proyek. Halaman HTML dibuka di tab baru (terisolasi).
 export function WorkFiles({ projectId, refreshKey }: { projectId: string; refreshKey: number }) {

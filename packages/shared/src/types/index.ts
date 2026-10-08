@@ -4,6 +4,7 @@ import type {
   ApprovalStatusSchema,
   CreateProjectInputSchema,
   DivisionConfigSchema,
+  FloorSchema,
   PersonaSchema,
   PlanTaskItemSchema,
   ProjectPlanSchema,
@@ -17,6 +18,7 @@ export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
 export type ApprovalStatus = z.infer<typeof ApprovalStatusSchema>;
 export type DivisionConfig = z.infer<typeof DivisionConfigSchema>;
+export type FloorConfig = z.infer<typeof FloorSchema>;
 export type Persona = z.infer<typeof PersonaSchema>;
 export type PlanTaskItem = z.infer<typeof PlanTaskItemSchema>;
 export type ProjectPlan = z.infer<typeof ProjectPlanSchema>;

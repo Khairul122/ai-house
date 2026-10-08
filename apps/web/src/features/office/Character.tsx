@@ -5,14 +5,19 @@ import { type Camera, type Group, type OrthographicCamera, Vector3 } from "three
 import type { AgentStatus, Dispatch } from "../../state/reduce.ts";
 import { play, type SoundName } from "../../lib/sound.ts";
 import { env } from "../../state/env.ts";
-import { office, useCoordinatorId, useDivisions } from "../../state/store.ts";
+import { camera as view } from "../../state/camera.ts";
+import { coordinatorId, getFloors, meetingOn, office, useDivisions } from "../../state/store.ts";
 import { setFocus, useFocus } from "../../state/focus.ts";
 import { useAgentStatus } from "../../state/useAgentStatus.ts";
 import { CharacterPeek } from "./CharacterPeek.tsx";
 import {
   type Act,
   deskOf,
+  FLOOR_H,
   insideOf,
+  levelOf,
+  meetingIdOf,
+  meetingSeats,
   LEISURE,
   POOL,
   randomInRoom,
@@ -22,6 +27,7 @@ import {
   standOf,
   toCorridor,
   type Vec2,
+  type Waypoint,
   WORSHIP_SPOTS,
   type WorshipStyle
 } from "./layout.ts";
@@ -164,8 +170,6 @@ interface Props {
 export function Character({ id, reducedMotion, onSelect }: Props) {
   const room = roomById(id)!;
   const look = useLook(id);
-  // koordinator yang mengantar map tugas ke divisi tujuan
-  const isCoordinator = useCoordinatorId() === id;
   const focused = useFocus() === id;
   const { agent, status } = useAgentStatus(id);
 
@@ -185,6 +189,8 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
   const talkAnchor = useRef<Group>(null);
   const talkOn = useRef(false);
   const [talkVisible, setTalkVisible] = useState(false);
+  // label HTML disembunyikan untuk karakter di luar lantai yang sedang dilihat
+  const [hidden, setHidden] = useState(false);
   const umbrella = useRef<Group>(null);
   const emotionIcons = useRef<Group>(null);
   const incense = useRef<Group>(null);
@@ -196,8 +202,10 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     () => ({
       x: seat[0],
       z: seat[1],
+      level: room.level,
+      y: room.level * FLOOR_H,
       facing: faceDesk,
-      path: [] as Vec2[],
+      path: [] as Waypoint[],
       goal: { key: "start", zone: id, at: seat, pose: "sit", face: faceDesk } as Goal,
       idle: null as Goal | null,
       nextIdle: Date.now() + Math.random() * 6000,
@@ -279,21 +287,31 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
 
     // 1. Pilih tujuan dari status asli backend.
     let goal: Goal;
-    if (isCoordinator && status !== "waiting" && !brain.carrying && s.dispatches.length > 0) {
-      brain.carrying = s.dispatches[0];
+    // koordinator/ketua bidang mengantar map tugas yang ia bagikan ke divisi tujuan
+    const mine = status !== "waiting" && !brain.carrying ? s.dispatches.find((d) => (d.from ?? coordinatorId()) === id) : undefined;
+    if (mine) {
+      brain.carrying = mine;
       brain.handoverAt = 0;
       leaveMeet(id);
       releaseAll(id);
     }
+    // rapat bidang: seluruh lantai berkumpul di ruang rapat, kecuali yang menunggu izin atau gagal
+    const meetingRoom = meetingOn(room.floor) && !brain.carrying && status !== "waiting" && status !== "failed" ? roomById(meetingIdOf(room.floor)) : undefined;
     // jadwal ibadah memakai jam simulasi/nyata; dicek sekali per detik
     if (now > brain.worshipCheckAt) {
       brain.worshipCheckAt = now + 1000;
       brain.worshipEnd = worshipUntil(religion, env.now());
     }
-    const worshipping = status === "idle" && !brain.carrying && brain.worshipEnd !== null && !!religion;
-    if (worshipping) leaveMeet(id);
-    const meet = status === "idle" && !brain.carrying && !worshipping ? meetOf(id, now) : undefined;
-    if (brain.carrying) {
+    const worshipping = status === "idle" && !brain.carrying && !meetingRoom && brain.worshipEnd !== null && !!religion;
+    if (worshipping || meetingRoom) leaveMeet(id);
+    const meet = status === "idle" && !brain.carrying && !worshipping && !meetingRoom ? meetOf(id, now) : undefined;
+    if (meetingRoom) {
+      const members = getFloors().find((f) => f.id === room.floor)?.divisionIds ?? [];
+      const seats = meetingSeats(meetingRoom);
+      const i = Math.max(0, members.indexOf(id)) % seats.length;
+      goal = { key: `rapat-${i}`, zone: meetingRoom.id, at: seats[i].at, pose: "sit", face: seats[i].face };
+      if (brain.worshipKey) brain.worshipKey = "";
+    } else if (brain.carrying) {
       const target = roomById(brain.carrying.to);
       goal = target
         ? { key: `deliver-${brain.carrying.taskId}`, zone: target.id, at: insideOf(target), pose: "stand" }
@@ -333,13 +351,18 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       goal = brain.idle;
     }
 
-    if (goal.key !== brain.goal.key) brain.path = buildPath(zoneAt(brain.x, brain.z), goal.zone, goal.at, [brain.x, brain.z]);
+    if (goal.key !== brain.goal.key) {
+      brain.path = buildPath(zoneAt(brain.x, brain.z, brain.level), goal.zone, goal.at, [brain.x, brain.z], brain.level, levelOf(goal.zone));
+    }
     brain.goal = goal;
 
-    // 2. Berjalan menyusuri titik rute.
+    // 2. Berjalan menyusuri titik rute. Di kabin lift: tunggu sampai tiba di lantai tujuan.
+    const floorY = brain.level * FLOOR_H;
+    brain.y += (floorY - brain.y) * Math.min(1, dt * 2.2);
+    const riding = Math.abs(brain.y - floorY) > 0.04;
     const moving = brain.path.length > 0;
-    if (moving) {
-      const [tx, tz] = brain.path[0];
+    if (moving && !riding) {
+      const [tx, tz, toLevel] = brain.path[0];
       const dx = tx - brain.x;
       const dz = tz - brain.z;
       const dist = Math.hypot(dx, dz);
@@ -349,6 +372,7 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       if (dist <= step) {
         brain.x = tx;
         brain.z = tz;
+        if (toLevel !== undefined) brain.level = toLevel;
         brain.path.shift();
       } else {
         brain.x += (dx / dist) * step;
@@ -386,7 +410,7 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     let tiltX = 0;
     let lift = 0;
 
-    const outside = zoneAt(brain.x, brain.z) === "outside";
+    const outside = zoneAt(brain.x, brain.z, brain.level) === "outside";
     if (act === "worship") {
       const style = goal.style;
       const c = (t + id.length * 1.7) % 20; // tiap jamaah sedikit berbeda irama
@@ -537,6 +561,8 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     const doing: Doing =
       act === "worship"
         ? "ibadah"
+        : meetingRoom && !moving
+          ? "ngobrol"
         : status === "working" && !moving
           ? "kerja"
           : moving
@@ -559,6 +585,10 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     sim.emotion = emotion;
     sim.activity = brain.carrying
       ? `Mengantar map tugas ke ${lookOf(brain.carrying.to).name}`
+      : meetingRoom
+        ? status === "working"
+          ? `Rapat bidang: ${agent?.task?.title ?? "berdiskusi"}`
+          : "Ikut rapat bidang di ruang rapat"
       : status === "working"
         ? `Mengerjakan "${agent?.task?.title ?? "tugas"}"`
         : status === "waiting"
@@ -612,7 +642,13 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     }
     if (tilt.current) tilt.current.position.y += (lift - tilt.current.position.y) * k;
 
-    g.position.set(brain.x, y, brain.z);
+    g.position.set(brain.x, brain.y + y, brain.z);
+    const viewFloor = view.get().floor;
+    const hide = viewFloor !== null && brain.level > viewFloor;
+    g.visible = !hide;
+    // label HTML hanya untuk karakter di lantai yang dilihat; di bawahnya tertutup pelat lantai
+    const quiet = viewFloor === null || brain.level !== viewFloor;
+    if (quiet !== hidden) setHidden(quiet);
     let diff = brain.facing - g.rotation.y;
     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
     g.rotation.y += diff * Math.min(1, dt * 10);
@@ -635,7 +671,7 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     if (incense.current) incense.current.visible = act === "worship" && goal.style === "dupa";
 
     // suara interaksi, hanya bila karakter terlihat dan kamera cukup dekat
-    const vol = audibility(camera, brain.x, brain.z);
+    const vol = hide ? 0 : audibility(camera, brain.x, brain.z);
     if (vol > 0) {
       if (act === "worship" && brain.rang !== goal.key) {
         brain.rang = goal.key;
@@ -814,7 +850,7 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
         </group>
       )}
 
-      {focused && (
+      {focused && !hidden && (
         <CharacterPeek
           id={id}
           status={status}
@@ -826,14 +862,14 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
         />
       )}
 
-      {!focused && status === "working" && agent?.task && (
+      {!focused && !hidden && status === "working" && agent?.task && (
         <Html position={[0, 1.85, 0]} center zIndexRange={[10, 0]} pointerEvents="none">
           <div className="speech">{agent.task.title}</div>
         </Html>
       )}
 
       <group ref={talkAnchor} position={[0, 1.75, 0]}>
-        {status === "idle" && talkVisible && (
+        {status === "idle" && talkVisible && !hidden && (
           <Html center zIndexRange={[10, 0]} pointerEvents="none">
             <div ref={talk} className="speech" />
           </Html>

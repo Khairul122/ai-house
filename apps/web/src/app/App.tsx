@@ -13,9 +13,11 @@ import { useReducedMotion } from "../lib/hooks.ts";
 import { ActivityPanel } from "../panels/ActivityPanel.tsx";
 import { ApprovalsPanel } from "../panels/ApprovalsPanel.tsx";
 import { DivisionPanel, DivisionsPanel } from "../panels/DivisionsPanel.tsx";
+import { FloorPanel, FloorsPanel } from "../panels/FloorsPanel.tsx";
 import { ProjectPanel } from "../panels/ProjectPanel.tsx";
 import { ProjectsPanel } from "../panels/ProjectsPanel.tsx";
 import { ReportPanel, ReportsPanel } from "../panels/ReportsPanel.tsx";
+import { SocialPanel } from "../panels/SocialPanel.tsx";
 import { useEnvironmentClock } from "../state/env.ts";
 import { getDivisions, useLiveOffice } from "../state/store.ts";
 
@@ -78,6 +80,7 @@ function Shell() {
               reducedMotion={reducedMotion}
               onSelect={select}
               onOpenProjects={() => navigate("/projects")}
+              onOpenFloor={(id) => navigate(`/floors/${id}`)}
             />
           </Suspense>
         ) : (
@@ -100,6 +103,9 @@ function Shell() {
         <Route path="/activity" element={<ActivityPanel />} />
         <Route path="/divisions" element={<DivisionsPanel />} />
         <Route path="/divisions/:id" element={<DivisionPanel />} />
+        <Route path="/floors" element={<FloorsPanel />} />
+        <Route path="/floors/:id" element={<FloorPanel />} />
+        <Route path="/social" element={<SocialPanel />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 

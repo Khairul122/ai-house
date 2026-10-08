@@ -13,6 +13,7 @@ permission:
   webfetch: allow
 religion: protestan
 order: 7
+floor: software
 persona:
   name: "Grace Natalia"
   short: "QA"

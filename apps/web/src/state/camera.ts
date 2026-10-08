@@ -8,6 +8,7 @@ export interface CameraState {
   tour: boolean;
   tourTarget: string | null; // ruangan yang sedang dikunjungi tur
   resetAt: number; // naik saat pengguna minta kamera kembali ke posisi awal
+  floor: number | null; // lantai yang dilihat; lantai di atasnya disembunyikan. null = semua lantai
 }
 
 let state: CameraState = {
@@ -15,6 +16,7 @@ let state: CameraState = {
   tour: false,
   tourTarget: null,
   resetAt: 0,
+  floor: 0, // mulai dari lantai dasar; tampilan "semua lantai" hanya menampilkan papan nama lantai
 };
 const listeners = new Set<() => void>();
 
@@ -29,6 +31,7 @@ export const camera = {
   setTour: (tour: boolean) =>
     set({ tour, tourTarget: tour ? state.tourTarget : null }),
   setTourTarget: (tourTarget: string | null) => set({ tourTarget }),
+  setFloor: (floor: number | null) => set({ floor }),
 };
 
 export function useCamera<T>(select: (s: CameraState) => T): T {

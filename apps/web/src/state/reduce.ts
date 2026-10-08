@@ -9,6 +9,7 @@ export interface AgentState {
 
 export interface Dispatch {
   taskId: string;
+  from?: string | null; // koordinator/ketua bidang yang mengantar map tugas
   to: string;
   title: string;
 }

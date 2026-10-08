@@ -13,6 +13,7 @@ permission:
   webfetch: allow
 religion: islam
 order: 4
+floor: software
 persona:
   name: "Dimas Arya"
   short: "Dev"

@@ -1,4 +1,4 @@
-import { CheckSquare, FileText, FolderKanban, History, Users } from "lucide-react";
+import { Building2, CheckSquare, FileText, FolderKanban, History, Share2, Users } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useAutonomy } from "../state/autonomy.ts";
 import { useOffice } from "../state/store.ts";
@@ -11,6 +11,8 @@ export function BottomNav() {
   // Mode otomatis: Persetujuan hanya muncul bila memang ada yang menunggu.
   const items = [
     { label: "Proyek", path: "/projects", icon: FolderKanban },
+    { label: "Lantai", path: "/floors", icon: Building2 },
+    { label: "Sosmed", path: "/social", icon: Share2 },
     { label: "Laporan", path: "/reports", icon: FileText },
     ...(mode === "ask" || pending > 0 ? [{ label: "Persetujuan", path: "/approvals", icon: CheckSquare }] : []),
     { label: "Aktivitas", path: "/activity", icon: History },

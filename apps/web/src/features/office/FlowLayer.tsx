@@ -10,7 +10,7 @@ import {
   Vector3,
 } from "three";
 import { FLOW_MS, type FlowKind, activeFlows } from "../../state/flows.ts";
-import { roomById } from "./layout.ts";
+import { FLOOR_H, roomById } from "./layout.ts";
 
 const COLOR: Record<FlowKind, Color> = {
   out: new Color("#5B8DEF"),
@@ -49,10 +49,10 @@ function FlowSlot({ index }: { index: number }) {
     if (s.id !== flow.id) {
       // busur baru: titik tengah naik sebanding jaraknya
       s.id = flow.id;
-      s.a.set(from.x, 0.9, from.z);
-      s.b.set(to.x, 0.9, to.z);
+      s.a.set(from.x, from.level * FLOOR_H + 0.9, from.z);
+      s.b.set(to.x, to.level * FLOOR_H + 0.9, to.z);
       s.mid.addVectors(s.a, s.b).multiplyScalar(0.5);
-      s.mid.y = 2.6 + s.a.distanceTo(s.b) * 0.18;
+      s.mid.y = Math.max(s.a.y, s.b.y) + 1.7 + s.a.distanceTo(s.b) * 0.18;
       s.curve.v0.copy(s.a);
       s.curve.v1.copy(s.mid);
       s.curve.v2.copy(s.b);
@@ -74,7 +74,7 @@ function FlowSlot({ index }: { index: number }) {
     if (ring.current) {
       const r = travel < 1 ? 0 : (t - 0.6) / 0.4; // riak di lantai ruangan tujuan
       ring.current.visible = r > 0;
-      ring.current.position.set(to.x, 0.08, to.z);
+      ring.current.position.set(to.x, to.level * FLOOR_H + 0.08, to.z);
       ring.current.scale.setScalar(0.4 + r * 2.2);
       (ring.current.material as MeshBasicMaterial).opacity = 0.7 * (1 - r);
     }

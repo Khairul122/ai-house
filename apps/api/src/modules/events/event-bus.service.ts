@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { Injectable } from "@nestjs/common";
 
 export interface SystemEvent {
-  type: "division.status" | "task.updated" | "run.event" | "approval.created" | "approval.decided" | "project.updated" | "task.dispatched";
+  type: "division.status" | "task.updated" | "run.event" | "approval.created" | "approval.decided" | "project.updated" | "task.dispatched" | "social.updated";
   payload: any;
   timestamp: string;
 }

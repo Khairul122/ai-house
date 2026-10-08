@@ -12,6 +12,8 @@ import { ProjectsController } from "./modules/projects/http/projects.controller.
 import { WorkspaceFilesController } from "./modules/projects/http/workspace-files.controller.js";
 import { TaskService } from "./modules/tasks/application/task.service.js";
 import { OfficeController } from "./modules/office/office.controller.js";
+import { SocialController } from "./modules/social/social.controller.js";
+import { SocialService } from "./modules/social/social.service.js";
 import { OrchestratorService } from "./modules/orchestrator/orchestrator.service.js";
 import { TelegramBotService } from "./modules/telegram/bot.service.js";
 
@@ -23,7 +25,8 @@ import { TelegramBotService } from "./modules/telegram/bot.service.js";
     WorkspaceFilesController,
     ApprovalsController,
     EventsController,
-    OfficeController
+    OfficeController,
+    SocialController
   ],
   providers: [
     AuditService,
@@ -34,6 +37,7 @@ import { TelegramBotService } from "./modules/telegram/bot.service.js";
     FileDivisionRepository,
     ApprovalService,
     OrchestratorService,
+    SocialService,
     runtimeProvider
   ]
 })

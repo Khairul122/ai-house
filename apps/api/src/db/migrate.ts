@@ -21,6 +21,8 @@ export async function migrateDb() {
       workspace_path TEXT NOT NULL,
       token_budget INTEGER,
       tokens_used INTEGER NOT NULL DEFAULT 0,
+      floor_id TEXT,
+      kind TEXT NOT NULL DEFAULT 'project',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -109,7 +111,38 @@ export async function migrateDb() {
       key TEXT PRIMARY KEY,
       value_json TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS social_accounts (
+      id TEXT PRIMARY KEY,
+      platform TEXT NOT NULL,
+      label TEXT NOT NULL,
+      handle TEXT,
+      secret_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS social_posts (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      task_id TEXT,
+      division_id TEXT,
+      account_id TEXT,
+      caption TEXT NOT NULL,
+      media_json TEXT NOT NULL,
+      source TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      result_url TEXT,
+      error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects (id)
+    );
   `);
+  // Kolom yang ditambahkan setelah rilis awal; database lama mendapatkannya di sini.
+  const projectCols = await sqliteClient.execute("PRAGMA table_info(projects)");
+  const has = new Set(projectCols.rows.map((r) => String(r.name)));
+  if (!has.has("floor_id")) await sqliteClient.execute("ALTER TABLE projects ADD COLUMN floor_id TEXT");
+  if (!has.has("kind")) await sqliteClient.execute("ALTER TABLE projects ADD COLUMN kind TEXT NOT NULL DEFAULT 'project'");
   console.log("Database tables initialized successfully.");
 }
 

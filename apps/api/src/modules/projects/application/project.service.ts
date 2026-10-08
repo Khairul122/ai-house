@@ -29,7 +29,8 @@ export class ProjectService {
     private readonly eventBus: EventBusService
   ) {}
 
-  async createProject(title: string, goal: string, tokenBudget?: number) {
+  // `floorId`: proyek untuk satu bidang (lantai); kosong = seluruh gedung. `kind`: "meeting" untuk rapat bidang.
+  async createProject(title: string, goal: string, tokenBudget?: number, opts: { floorId?: string | null; kind?: "project" | "meeting" } = {}) {
     const id = ulid();
     const workspacePath = workspaceFor(id, title);
 
@@ -46,12 +47,14 @@ export class ProjectService {
       workspacePath,
       tokenBudget: tokenBudget || null,
       tokensUsed: 0,
+      floorId: opts.floorId ?? null,
+      kind: opts.kind ?? "project",
       createdAt: now,
       updatedAt: now
     };
 
     await db.insert(projects).values(newProject);
-    await this.auditService.record("system", "project_created", "project", id, { title, goal });
+    await this.auditService.record("system", newProject.kind === "meeting" ? "meeting_created" : "project_created", "project", id, { title, goal, floorId: newProject.floorId });
     this.eventBus.publish("project.updated", newProject);
 
     return newProject;
@@ -60,6 +63,15 @@ export class ProjectService {
   async getProject(id: string) {
     return db.query.projects.findFirst({
       where: eq(projects.id, id)
+    });
+  }
+
+  // Rapat terbaru; yang berstatus in_progress dipakai kantor 3D untuk mengumpulkan karakter di ruang rapat.
+  async listMeetings() {
+    return db.query.projects.findMany({
+      where: eq(projects.kind, "meeting"),
+      orderBy: (p, { desc }) => [desc(p.createdAt)],
+      limit: 30
     });
   }
 

@@ -1,7 +1,9 @@
-// Denah kantor: dua baris ruangan mengapit koridor yang membentang di sumbu X.
+// Denah kantor: gedung bertingkat, satu lantai per bidang. Tiap lantai punya dua baris ruangan
+// mengapit koridor di sumbu X, ruang rapat di ujung timur, dan lift di ujung barat.
 export const ROOM_W = 4.4;
 export const ROOM_D = 4;
 export const WALL_H = 1.7;
+export const FLOOR_H = 3.2; // tinggi antar-lantai
 export const CORRIDOR_HALF = 1.3;
 export const FLOOR_HALF_X = 16.5;
 export const FLOOR_HALF_Z = CORRIDOR_HALF + ROOM_D + 0.3;
@@ -12,41 +14,68 @@ export interface RoomDef {
   id: string;
   x: number;
   z: number; // pusat ruangan
-  w: number; // lebar ruangan, menyempit bila divisi lebih dari kapasitas gedung
+  w: number; // lebar ruangan, menyempit bila divisi lebih dari kapasitas lantai
   side: Side;
+  level: number; // 0 = lantai dasar
+  floor: string; // id lantai (bidang)
+  meeting?: boolean; // ruang rapat lantai, bukan ruangan divisi
 }
 
-// Lebar total deretan ruangan di dalam gedung (antara meja resepsionis dan pantry).
-const ROW_SPAN = 25;
-const ROW_Z = CORRIDOR_HALF + ROOM_D / 2;
+export interface FloorPlan {
+  id: string;
+  divisionIds: string[];
+}
 
-// Denah dihitung dari daftar divisi: separuh pertama di deretan utara, sisanya di selatan,
-// kolom keduanya sejajar dan berpusat di tengah koridor.
-export function buildRooms(ids: string[]): RoomDef[] {
-  const cols = Math.max(1, Math.ceil(ids.length / 2));
-  const spacing = Math.min(5, ROW_SPAN / cols);
-  const w = Math.min(ROOM_W, spacing - 0.6);
-  const xAt = (i: number) => (i - (cols - 1) / 2) * spacing;
-  return ids.map((id, i) => {
-    const north = i < cols;
-    const col = north ? i : i - cols;
-    return { id, x: xAt(col), z: north ? -ROW_Z : ROW_Z, w, side: north ? "n" : "s" };
+// Deretan ruangan divisi mengisi x dari -12.5 sampai 7.5; sisanya untuk ruang rapat.
+const ROW_LEFT = -12.5;
+const ROW_SPAN = 20;
+const ROW_Z = CORRIDOR_HALF + ROOM_D / 2;
+export const MEETING_W = 5.2;
+export const MEETING_X = 10.6;
+
+export const meetingIdOf = (floorId: string) => `rapat:${floorId}`;
+
+// Denah dihitung dari daftar lantai: di tiap lantai separuh pertama divisi di deretan utara, sisanya
+// di selatan, kolom sejajar. Ruang rapat lantai di deretan utara ujung timur.
+export function buildRooms(floors: FloorPlan[]): RoomDef[] {
+  return floors.flatMap((f, level) => {
+    const ids = f.divisionIds;
+    const cols = Math.max(1, Math.ceil(ids.length / 2));
+    const spacing = Math.min(5, ROW_SPAN / cols);
+    const w = Math.min(ROOM_W, spacing - 0.6);
+    const xAt = (i: number) => ROW_LEFT + ROW_SPAN / 2 + (i - (cols - 1) / 2) * spacing;
+    const rooms: RoomDef[] = ids.map((id, i) => {
+      const north = i < cols;
+      const col = north ? i : i - cols;
+      return { id, x: xAt(col), z: north ? -ROW_Z : ROW_Z, w, side: north ? "n" : "s", level, floor: f.id };
+    });
+    rooms.push({ id: meetingIdOf(f.id), x: MEETING_X, z: -ROW_Z, w: MEETING_W, side: "n", level, floor: f.id, meeting: true });
+    return rooms;
   });
 }
 
+let all: RoomDef[] = [];
 let rooms: RoomDef[] = [];
+let meetingRooms: RoomDef[] = [];
 let roomKey = "";
 
-// Dipanggil setiap daftar divisi dimuat ulang dari server.
-export function setRoomOrder(ids: string[]) {
-  const key = ids.join("|");
+// Dipanggil setiap daftar lantai/divisi dimuat ulang dari server.
+export function setRoomOrder(floors: FloorPlan[]) {
+  const key = floors.map((f) => `${f.id}:${f.divisionIds.join(",")}`).join("|");
   if (key === roomKey) return;
   roomKey = key;
-  rooms = buildRooms(ids);
+  all = buildRooms(floors);
+  rooms = all.filter((r) => !r.meeting);
+  meetingRooms = all.filter((r) => r.meeting);
 }
 
+// Ruangan divisi saja (ruang rapat lewat getMeetingRooms).
 export const getRooms = () => rooms;
-export const roomById = (id: string) => rooms.find((r) => r.id === id);
+export const allRooms = () => all;
+export const getMeetingRooms = () => meetingRooms;
+export const getLevels = () => 1 + all.reduce((n, r) => Math.max(n, r.level), 0);
+export const roomById = (id: string) => all.find((r) => r.id === id);
+export const levelOf = (zone: string) => roomById(zone)?.level ?? 0;
 
 export type Vec2 = [number, number];
 
@@ -58,8 +87,21 @@ export const deskOf = (r: RoomDef): Vec2 => [r.x, r.z - toCorridor(r) * 0.2];
 export const standOf = (r: RoomDef): Vec2 => [r.x + 0.75, r.z - toCorridor(r) * 0.75];
 export const insideOf = (r: RoomDef): Vec2 => [r.x, r.z + toCorridor(r) * (ROOM_D / 2 - 0.6)];
 export const laneOf = (r: RoomDef): Vec2 => [r.x, toCorridor(r) * -0.45];
+// Jalur berpindah lantai: [x, z, lantai tujuan]. Titik dengan lantai menandai turun/naik lift.
+export type Waypoint = [number, number] | [number, number, number];
 
-// Titik bersama di ujung koridor.
+// Lift di ujung barat tiap lantai: pintu di koridor, kabin di sisi utara. Pindah lantai terjadi di kabin.
+export const LIFT = { door: [-14.6, -0.9] as Vec2, cab: [-14.6, -3.4] as Vec2 };
+
+// Kursi ruang rapat: empat di tiap sisi meja panjang, menghadap meja.
+export function meetingSeats(r: RoomDef): { at: Vec2; face: number }[] {
+  return [-1.5, -0.5, 0.5, 1.5].flatMap((dx) => [
+    { at: [r.x + dx, r.z - 0.95] as Vec2, face: 0 },
+    { at: [r.x + dx, r.z + 0.95] as Vec2, face: Math.PI }
+  ]);
+}
+
+// Titik bersama di ujung koridor lantai dasar.
 export const SPOTS = {
   pantry: [14.6, -1.2] as Vec2,
   sofa: [14.6, 1.4] as Vec2,

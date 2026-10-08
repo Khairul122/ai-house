@@ -17,6 +17,8 @@ export const projects = sqliteTable("projects", {
   workspacePath: text("workspace_path").notNull(),
   tokenBudget: integer("token_budget"),
   tokensUsed: integer("tokens_used").notNull().default(0),
+  floorId: text("floor_id"), // null = seluruh gedung
+  kind: text("kind").notNull().default("project"), // project | meeting
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull()
 });
@@ -97,4 +99,31 @@ export const auditLog = sqliteTable("audit_log", {
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   valueJson: text("value_json").notNull()
+});
+
+// Akun sosial media terdaftar. `secretJson` berisi token dan tidak pernah dikirim ke browser.
+export const socialAccounts = sqliteTable("social_accounts", {
+  id: text("id").primaryKey(), // slug yang dipakai agen, mis. "tiktok-utama"
+  platform: text("platform").notNull(),
+  label: text("label").notNull(),
+  handle: text("handle"),
+  secretJson: text("secret_json").notNull(),
+  createdAt: text("created_at").notNull()
+});
+
+// Unggahan yang diajukan divisi (atau pemilik) dan menunggu ditinjau sebelum benar-benar tayang.
+export const socialPosts = sqliteTable("social_posts", {
+  id: text("id").primaryKey(), // ulid
+  projectId: text("project_id").notNull().references(() => projects.id),
+  taskId: text("task_id"),
+  divisionId: text("division_id"),
+  accountId: text("account_id"),
+  caption: text("caption").notNull(),
+  mediaJson: text("media_json").notNull(), // path relatif terhadap folder kerja proyek
+  source: text("source"), // berkas publikasi/*.json asal pengajuan
+  status: text("status").notNull().default("pending"), // pending | publishing | published | failed | rejected
+  resultUrl: text("result_url"),
+  error: text("error"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull()
 });

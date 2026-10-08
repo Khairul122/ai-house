@@ -8,9 +8,10 @@ import { Character } from "./Character.tsx";
 import { camera, useCamera } from "../../state/camera.ts";
 import { setFocus } from "../../state/focus.ts";
 import { visibleStatus } from "../../state/reduce.ts";
-import { office, useHouse, useRooms } from "../../state/store.ts";
+import { office, useFloors, useHouse, useMeetings, useRooms } from "../../state/store.ts";
+import { LiftCore, MeetingRoom, UpperFloor } from "./Building.tsx";
 import { FlowLayer } from "./FlowLayer.tsx";
-import { CORRIDOR_HALF, FLOOR_HALF_X, FLOOR_HALF_Z, getRooms, roomById } from "./layout.ts";
+import { CORRIDOR_HALF, FLOOR_H, FLOOR_HALF_X, FLOOR_HALF_Z, getMeetingRooms, getRooms, roomById } from "./layout.ts";
 import { MAT, TONES, tint, toneAt } from "./looks.ts";
 import { Box } from "./parts.tsx";
 import { BigPlant } from "./props.tsx";
@@ -23,11 +24,13 @@ export interface OfficeProps {
   reducedMotion: boolean;
   onSelect: (id: string) => void;
   onOpenProjects: () => void;
+  onOpenFloor: (floorId: string) => void;
 }
 
 const PANEL_W = 420; // lebar panel samping di laptop, harus sama dengan CSS
 
 function CameraRig({ selectedId, panelOpen, reducedMotion }: Pick<OfficeProps, "selectedId" | "panelOpen" | "reducedMotion">) {
+  const floor = useCamera((c) => c.floor);
   const ref = useRef<CameraControls>(null);
   const { size } = useThree();
   const view = useCamera((c) => c.view);
@@ -80,15 +83,17 @@ function CameraRig({ selectedId, panelOpen, reducedMotion }: Pick<OfficeProps, "
     if (!c) return;
     const anim = !reducedMotion;
     const room = selectedId ? roomById(selectedId) : tour && tourTarget ? roomById(tourTarget) : null;
-    const zoom = room ? Math.max(officeFit * (selectedId ? 2.4 : 1.8), selectedId ? 55 : 40) : fit;
-    if (room) void c.moveTo(room.x, 0.6, room.z, anim);
-    else void c.moveTo(0, 0, 0, anim);
+    // mode satu lantai: ruangan di lantai lain membuat tampilan pindah ke lantainya
+    if (room && floor !== null && room.level !== floor) camera.setFloor(room.level);
+    const zoom = room ? Math.max(officeFit * (selectedId ? 2.4 : 1.8), selectedId ? 55 : 40) : floor !== null ? Math.max(fit, officeFit) : fit;
+    if (room) void c.moveTo(room.x, room.level * FLOOR_H + 0.6, room.z, anim);
+    else void c.moveTo(0, (floor ?? 0) * FLOOR_H, 0, anim);
     void c.zoomTo(zoom, anim);
     // geser fokus supaya ruangan tidak tertutup panel
     const ox = panelOpen && wide ? PANEL_W / 2 / zoom : 0;
     const oy = panelOpen && !wide ? (size.height * 0.34) / zoom : 0;
     void c.setFocalOffset(ox, oy, 0, anim);
-  }, [selectedId, panelOpen, fit, officeFit, wide, size.height, reducedMotion, tour, tourTarget, resetAt]);
+  }, [selectedId, panelOpen, fit, officeFit, wide, size.height, reducedMotion, tour, tourTarget, resetAt, floor]);
 
   return (
     <CameraControls
@@ -103,7 +108,7 @@ function CameraRig({ selectedId, panelOpen, reducedMotion }: Pick<OfficeProps, "
   );
 }
 
-function Commons({ onOpenProjects }: { onOpenProjects: () => void }) {
+function Commons({ onOpenProjects, signs }: { onOpenProjects: () => void; signs: boolean }) {
   return (
     <group>
       {/* resepsionis: tempat membuat proyek baru; diklik lewat satu kotak tak terlihat */}
@@ -119,12 +124,16 @@ function Commons({ onOpenProjects }: { onOpenProjects: () => void }) {
       >
         <boxGeometry args={[1, 1.4, 2.4]} />
       </mesh>
-      <Html position={[-15.2, 1.7, 0.9]} center zIndexRange={[10, 0]} pointerEvents="none">
-        <div className="room-sign">Resepsionis</div>
-      </Html>
-      <Html position={[15.7, 1.7, -1.4]} center zIndexRange={[10, 0]} pointerEvents="none">
-        <div className="room-sign">Pantry</div>
-      </Html>
+      {signs && (
+        <>
+          <Html position={[-15.2, 1.7, 0.9]} center zIndexRange={[10, 0]} pointerEvents="none">
+            <div className="room-sign">Resepsionis</div>
+          </Html>
+          <Html position={[15.7, 1.7, -1.4]} center zIndexRange={[10, 0]} pointerEvents="none">
+            <div className="room-sign">Pantry</div>
+          </Html>
+        </>
+      )}
 
       <StaticBatch>
         {/* lantai gedung: pelat putih hangat, koridor kayu ek dengan karpet panjang */}
@@ -260,8 +269,42 @@ function DevStats() {
   return null;
 }
 
+// Lantai atas, lift, dan ruang rapat. Lantai di atas lantai yang dilihat tidak digambar (potongan ala rumah boneka).
+function Floors({ top, view, onOpenFloor }: { top: number; view: number | null; onOpenFloor: (id: string) => void }) {
+  const floors = useFloors();
+  const meetings = useMeetings();
+  useRooms(); // ikut digambar ulang saat denah berubah
+  if (!floors.length) return null;
+  const last = Math.min(top, floors.length - 1);
+  return (
+    <>
+      {floors
+        .filter((f) => f.level > 0 && f.level <= top)
+        .map((f) => (
+          <UpperFloor key={f.id} level={f.level} />
+        ))}
+      {/* StaticBatch menggabungkan geometri sekali: dipasang ulang saat jumlah lantai terlihat berubah */}
+      <LiftCore key={`${last}-${floors.map((f) => f.id).join()}`} floors={floors} top={last} only={view} />
+      {getMeetingRooms()
+        .filter((r) => r.level <= top)
+        .map((r) => (
+          <MeetingRoom
+            key={r.id}
+            room={r}
+            signs={view === r.level}
+            floorName={floors.find((f) => f.id === r.floor)?.name ?? r.floor}
+            active={meetings.some((m) => m.floorId === r.floor && m.status === "in_progress")}
+            onOpen={() => onOpenFloor(r.floor)}
+          />
+        ))}
+    </>
+  );
+}
+
 export default function OfficeCanvas(props: OfficeProps) {
-  const { selectedId, onSelect, reducedMotion, onOpenProjects } = props;
+  const { selectedId, onSelect, reducedMotion, onOpenProjects, onOpenFloor } = props;
+  const floor = useCamera((c) => c.floor);
+  const top = floor ?? Number.POSITIVE_INFINITY;
   // Mulai di kualitas menengah; naik bila perangkat kuat, turun bila frame mulai tersendat.
   const [quality, setQuality] = useState<Quality>(() => (window.innerWidth < 768 ? "low" : "mid"));
   const rooms = useRooms();
@@ -287,14 +330,17 @@ export default function OfficeCanvas(props: OfficeProps) {
       <FrameDriver />
       <Atmosphere />
 
-      {rooms.map((r, i) => (
-        <Room key={r.id} room={r} tone={toneAt(i)} selected={selectedId === r.id} onSelect={onSelect} onBoard={onOpenProjects} />
-      ))}
+      {rooms.map((r, i) =>
+        r.level <= top ? (
+          <Room key={r.id} room={r} tone={toneAt(i)} selected={selectedId === r.id} onSelect={onSelect} onBoard={onOpenProjects} signs={floor === r.level} />
+        ) : null
+      )}
+      <Floors top={top} view={floor} onOpenFloor={onOpenFloor} />
       {rooms.map((r) => (
         <Character key={r.id} id={r.id} reducedMotion={reducedMotion} onSelect={onSelect} />
       ))}
       <FlowLayer />
-      <Commons onOpenProjects={onOpenProjects} />
+      <Commons onOpenProjects={onOpenProjects} signs={floor === 0 || floor === null} />
       <Campus />
 
       <CameraRig {...props} />

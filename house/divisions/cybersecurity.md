@@ -13,6 +13,7 @@ permission:
   webfetch: allow
 religion: konghucu
 order: 10
+floor: data-security
 persona:
   name: "Hendra Gunawan"
   short: "Cyber"

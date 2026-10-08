@@ -46,13 +46,26 @@ export interface Division {
   description: string;
   model: string;
   role?: "coordinator" | "member";
+  floor?: string;
+  publish?: boolean;
   order?: number;
   religion?: string;
   persona?: Persona;
   permission: { read: string; edit: string; bash: { allow: string[]; ask: string[]; deny: string[] } };
 }
 
+// Lantai gedung = bidang (Software, Content Creator, ...), dari bawah ke atas.
+export interface Floor {
+  id: string;
+  name: string;
+  description: string;
+  level: number;
+  leadId: string | null;
+  divisionIds: string[];
+}
+
 let divisions: Division[] = [];
+let floors: Floor[] = [];
 const divisionListeners = new Set<() => void>();
 const subscribeDivisions = (l: () => void) => {
   divisionListeners.add(l);
@@ -60,6 +73,11 @@ const subscribeDivisions = (l: () => void) => {
 };
 
 export const getDivisions = () => divisions;
+export const getFloors = () => floors;
+
+export function useFloors(): Floor[] {
+  return useSyncExternalStore(subscribeDivisions, () => floors);
+}
 
 export function useDivisions(): Division[] {
   return useSyncExternalStore(subscribeDivisions, () => divisions);
@@ -74,23 +92,66 @@ export function useRooms(): RoomDef[] {
 export const coordinatorId = (list: Division[] = divisions): string | null =>
   (list.find((d) => d.role === "coordinator") ?? list[0])?.id ?? null;
 
+// Ketua bidang divisi ini (koordinator di lantainya), atau koordinator utama.
+export const leadFor = (divisionId: string | undefined): string | null => {
+  const floor = divisions.find((d) => d.id === divisionId)?.floor;
+  return divisions.find((d) => d.floor === floor && d.role === "coordinator")?.id ?? coordinatorId();
+};
+
 export function useCoordinatorId(): string | null {
   return coordinatorId(useDivisions());
 }
 
-// Tugas perencanaan milik koordinator (bukan hasil kerja divisi): tidak bisa direvisi dan tidak dihitung sebagai pekerjaan.
+// Tugas perencanaan milik koordinator (utama atau ketua bidang): tidak bisa direvisi dan tidak dihitung sebagai pekerjaan.
 export function useIsPlanTask(): (t: { divisionId: string; title: string }) => boolean {
-  const coordinator = useCoordinatorId();
+  const list = useDivisions();
   const title = useHouse()?.planTaskTitle;
-  return (t) => !!title && t.title === title && t.divisionId === coordinator;
+  return (t) => !!title && t.title === title && list.find((d) => d.id === t.divisionId)?.role === "coordinator";
 }
 
 export const reloadDivisions = () =>
-  fetchJson<Division[]>("/api/divisions")
-    .then((d) => {
+  Promise.all([fetchJson<Division[]>("/api/divisions"), fetchJson<Floor[]>("/api/floors")])
+    .then(([d, f]) => {
       divisions = d;
-      setRoomOrder(d.map((x) => x.id));
+      floors = f;
+      setRoomOrder(f);
       for (const l of divisionListeners) l();
+    })
+    .catch(() => {});
+
+// ---------- rapat bidang ----------
+
+export interface Meeting {
+  id: string;
+  title: string;
+  goal: string;
+  status: string;
+  floorId: string | null;
+  createdAt: string;
+}
+
+let meetings: Meeting[] = [];
+const meetingListeners = new Set<() => void>();
+
+// Lantai yang sedang rapat: karakternya berkumpul di ruang rapat. Dibaca tiap frame oleh karakter.
+export const meetingOn = (floorId: string | undefined) =>
+  !!floorId && meetings.some((m) => m.floorId === floorId && m.status === "in_progress");
+
+export function useMeetings(): Meeting[] {
+  return useSyncExternalStore(
+    (l) => {
+      meetingListeners.add(l);
+      return () => meetingListeners.delete(l);
+    },
+    () => meetings
+  );
+}
+
+const loadMeetings = () =>
+  fetchJson<Meeting[]>("/api/meetings")
+    .then((m) => {
+      meetings = m;
+      for (const l of meetingListeners) l();
     })
     .catch(() => {});
 
@@ -144,11 +205,13 @@ export function useLiveOffice() {
   useEffect(() => {
     reloadDivisions();
     loadHouse();
+    loadMeetings();
 
     const es = new EventSource("/api/events");
     es.onopen = () => {
       office.send({ type: "connection", payload: "live" });
       loadSnapshot();
+      loadMeetings();
       // berkas divisi bisa berubah selama server mati (divisi baru, persona, urutan)
       reloadDivisions();
       if (!house) loadHouse();
@@ -158,6 +221,7 @@ export function useLiveOffice() {
       try {
         const event = JSON.parse(m.data) as OfficeEvent;
         office.send(event);
+        if (event.type === "project.updated") loadMeetings();
         playEventSound(event);
         trackFlow(event);
         const toast = toastFor(event, divisionName);

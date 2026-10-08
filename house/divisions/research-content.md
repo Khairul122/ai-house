@@ -13,6 +13,7 @@ permission:
   webfetch: allow
 religion: buddha
 order: 5
+floor: data-security
 persona:
   name: "Liana Setiawan"
   short: "Riset"

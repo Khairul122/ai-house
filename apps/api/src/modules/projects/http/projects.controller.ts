@@ -34,12 +34,42 @@ export class ProjectsController {
     } catch (e) {
       throw new BadRequestException((e as Error).message);
     }
-    const project = await this.projectService.createProject(input.title, input.goal, input.tokenBudget);
+    const floor = input.floor ? this.divisions.floor(input.floor) : null;
+    if (input.floor && !floor) throw new BadRequestException(`Lantai ${input.floor} tidak dikenal.`);
+    if (floor && !floor.divisionIds.length) throw new BadRequestException(`Lantai ${floor.name} belum punya divisi.`);
+    const outside = floor ? (input.divisions ?? []).filter((d) => !floor.divisionIds.includes(d)) : [];
+    if (outside.length) throw new BadRequestException(`Divisi ${outside.join(", ")} bukan bagian dari lantai ${floor?.name}.`);
+    const project = await this.projectService.createProject(input.title, input.goal, input.tokenBudget, { floorId: floor?.id });
     const nameOf = (id: string) => this.divisions.loadById(id)?.name ?? id;
-    writeBrief(project.workspacePath, composeBrief(input, files, nameOf), files);
+    writeBrief(project.workspacePath, composeBrief(input, files, nameOf, floor?.name), files);
     // Mode otomatis: PM langsung mulai merencanakan tanpa perlu ditekan.
     if ((await getAutonomy()) === "auto") await this.orchestrator.planProject(project.id);
     return project;
+  }
+
+  @Get("floors")
+  floors() {
+    return this.divisions.loadFloors();
+  }
+
+  // Rapat bidang: tiap divisi di lantai menulis masukan, lalu ketua bidang menyusun notulen dan tindak lanjut.
+  @Post("floors/:id/meetings")
+  async meeting(@Param("id") id: string, @Body() body: { topic?: string; agenda?: string }) {
+    const floor = this.divisions.floor(id);
+    if (!floor) throw new BadRequestException(`Lantai ${id} tidak dikenal.`);
+    if (!floor.divisionIds.length) throw new BadRequestException(`Lantai ${floor.name} belum punya divisi.`);
+    const topic = body.topic?.trim() ?? "";
+    const agenda = body.agenda?.trim() ?? "";
+    if (topic.length < 3 || topic.length > 300) throw new BadRequestException("Topik rapat 3 sampai 300 karakter.");
+    if (agenda.length > 4000) throw new BadRequestException("Agenda maksimal 4000 karakter.");
+    const project = await this.projectService.createProject(`Rapat ${floor.name}: ${topic}`, agenda || topic, undefined, { floorId: floor.id, kind: "meeting" });
+    await this.orchestrator.startMeeting(project.id, topic, agenda);
+    return project;
+  }
+
+  @Get("meetings")
+  meetings() {
+    return this.projectService.listMeetings();
   }
 
   @Get("projects/:id/report")

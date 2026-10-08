@@ -1,0 +1,13 @@
+# Lantai gedung AI House dari bawah ke atas. Tiap lantai = satu bidang.
+# Divisi memilih lantainya lewat `floor: <id>` di berkas house/divisions/*.md.
+# Divisi ber-`role: coordinator` di sebuah lantai menjadi ketua bidang: menyusun rencana
+# proyek bidang itu dan memimpin rapatnya. Lantai tanpa ketua memakai koordinator utama.
+- id: software
+  name: Software Engineering
+  description: Produk, desain antarmuka, pengembangan, pengujian, dan rilis aplikasi.
+- id: data-security
+  name: Data, Riset & Keamanan
+  description: Analisis data, riset, keamanan siber, dan infrastruktur.
+- id: content
+  name: Content Creator
+  description: Strategi konten, desain grafis, video, tulisan, audio, dan publikasi sosial media.

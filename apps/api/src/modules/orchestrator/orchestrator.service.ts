@@ -174,15 +174,21 @@ export class OrchestratorService implements OnModuleInit {
 
   // ---------- perencanaan ----------
 
-  // Tugas perencanaan milik divisi koordinator (bukan tugas hasil rencana).
+  // Tugas perencanaan milik divisi koordinator (utama atau ketua bidang), bukan tugas hasil rencana.
   private isPlanTask(t: Pick<Task, "divisionId" | "title">) {
-    return t.title === PLAN_TASK_TITLE && t.divisionId === this.divisions.coordinatorId();
+    return t.title === PLAN_TASK_TITLE && this.divisions.loadById(t.divisionId)?.role === "coordinator";
+  }
+
+  // Divisi yang boleh menerima tugas proyek: divisi di lantai proyek, atau semua divisi untuk proyek seluruh gedung.
+  private scope(project: Pick<Project, "floorId">) {
+    const all = this.divisions.loadAll();
+    return project.floorId ? all.filter((d) => d.floor === project.floorId) : all;
   }
 
   async planProject(projectId: string) {
     const project = await this.mustProject(projectId);
     if (project.status !== "draft") throw new ConflictException("Rencana hanya bisa diminta untuk proyek berstatus draf.");
-    const pm = this.divisions.coordinator();
+    const pm = this.divisions.planner(project.floorId);
     if (!pm) throw new ConflictException("Belum ada divisi koordinator. Tambahkan `role: coordinator` pada salah satu berkas house/divisions/*.md.");
 
     await this.setProjectStatus(project, "planning");
@@ -199,11 +205,9 @@ export class OrchestratorService implements OnModuleInit {
   }
 
   private planPrompt(project: Project, pm: DivisionEntity) {
-    const ids = this.divisions
-      .loadAll()
-      .filter((d) => d.id !== pm.id)
-      .map((d) => `- ${d.id}: ${d.description}`)
-      .join("\n");
+    const scope = this.scope(project);
+    const others = scope.filter((d) => d.id !== pm.id);
+    const ids = (others.length ? others : scope).map((d) => `- ${d.id}: ${d.description}`).join("\n");
     return `${pm.prompt}
 
 Tujuan proyek "${project.title}": ${project.goal}
@@ -224,7 +228,7 @@ ${ids}`;
     try {
       const raw = fs.readFileSync(path.join(project.workspacePath, "plan.json"), "utf-8");
       const plan = ProjectPlanSchema.parse(JSON.parse(raw));
-      const known = new Set(this.divisions.loadAll().map((d) => d.id));
+      const known = new Set(this.scope(project).map((d) => d.id));
       const unknown = plan.tasks.filter((t) => !known.has(t.divisionId)).map((t) => t.divisionId);
       if (unknown.length) throw new Error(`divisi tidak dikenal: ${[...new Set(unknown)].join(", ")}`);
       if (!plan.tasks.length) throw new Error("rencana tidak berisi tugas");
@@ -240,7 +244,7 @@ ${ids}`;
           if (parent) await db.insert(taskDependencies).values({ taskId: idByTitle.get(t.title)!, dependsOnId: parent });
         }
       }
-      await this.audit.record(this.divisions.coordinatorId() ?? "koordinator", "project_planned", "project", projectId, { title: project.title, taskCount: plan.tasks.length });
+      await this.audit.record(this.divisions.planner(project.floorId)?.id ?? "koordinator", "project_planned", "project", projectId, { title: project.title, taskCount: plan.tasks.length });
       if ((await getAutonomy()) === "auto") {
         await this.audit.record("otomatis", "plan_approved", "project", projectId, { title: project.title });
         await this.setProjectStatus(project, "in_progress");
@@ -293,8 +297,8 @@ ${ids}`;
       for (const t of ready) {
         if (this.live.size >= this.maxRuns) break;
         const division = this.divisions.loadById(t.divisionId);
-        this.eventBus.publish("task.dispatched", { taskId: t.id, from: this.divisions.coordinatorId(), to: t.divisionId, title: t.title });
-        const { finished } = await this.launch(t, this.taskPrompt(t, division, project.workspacePath));
+        this.eventBus.publish("task.dispatched", { taskId: t.id, from: this.divisions.planner(project.floorId)?.id ?? null, to: t.divisionId, title: t.title });
+        const { finished } = await this.launch(t, await this.taskPrompt(t, division, project.workspacePath));
         void finished.then(() => this.tickAll());
       }
 
@@ -302,7 +306,7 @@ ${ids}`;
       const busy = [...this.live.values()].some((r) => r.projectId === project.id);
       if (busy || ready.length) continue;
       if (all.every((t) => t.status === "done")) {
-        await this.audit.record(this.divisions.coordinatorId() ?? "koordinator", "project_completed", "project", project.id, { title: project.title });
+        await this.audit.record(this.divisions.planner(project.floorId)?.id ?? "koordinator", project.kind === "meeting" ? "meeting_completed" : "project_completed", "project", project.id, { title: project.title });
         await this.setProjectStatus(project, "completed");
       } else if (all.some((t) => t.status === "failed" || t.status === "cancelled")) {
         await this.setProjectStatus(project, "failed");
@@ -354,12 +358,62 @@ Baca berkas pendukung yang relevan di folder brief/ sebelum menyusun rencana. Bi
     return revision;
   }
 
-  private taskPrompt(t: Task, division: DivisionEntity | null, workspace: string) {
+  // Rapat bidang: tiap divisi lantai menulis masukan, ketua bidang menunggu semuanya lalu menyusun notulen.
+  // Tidak melewati perencanaan karena susunan rapat selalu sama.
+  async startMeeting(projectId: string, topic: string, agenda = "") {
+    const project = await this.mustProject(projectId);
+    const floor = project.floorId ? this.divisions.floor(project.floorId) : null;
+    if (!floor?.leadId) throw new ConflictException("Rapat butuh lantai yang punya divisi.");
+    const nameOf = (id: string) => this.divisions.loadById(id)?.name ?? id;
+    const context = `Rapat bidang ${floor.name}.\nTopik: ${topic}${agenda && agenda !== topic ? `\nAgenda dan catatan pemilik:\n${agenda}` : ""}`;
+    const inputs: Task[] = [];
+    for (const id of floor.divisionIds.filter((d) => d !== floor.leadId)) {
+      inputs.push(
+        await this.insertTask(
+          project.id,
+          id,
+          `Masukan rapat: ${nameOf(id)}`,
+          `${context}\n\nSebagai ${nameOf(id)}, tulis masukan divisimu di rapat/${id}.md: pendapat tentang topik, ide konkret, risiko, apa yang bisa dikerjakan divisimu, dan apa yang kamu butuhkan dari divisi lain. Ringkas, maksimal satu halaman.`,
+          `rapat/${id}.md berisi masukan divisi`
+        )
+      );
+    }
+    const notes = await this.insertTask(
+      project.id,
+      floor.leadId,
+      "Notulen rapat",
+      `${context}\n\nKamu memimpin rapat ini. ${inputs.length ? "Baca semua masukan di folder rapat/, lalu tulis" : "Tulis"} rapat/notulen.md berisi ringkasan diskusi, keputusan, dan daftar tindak lanjut (divisi, tugas, tenggat) yang bisa dijadikan proyek berikutnya.`,
+      "rapat/notulen.md berisi ringkasan, keputusan, dan tindak lanjut"
+    );
+    for (const t of inputs) await db.insert(taskDependencies).values({ taskId: notes.id, dependsOnId: t.id });
+    await this.audit.record(floor.leadId, "meeting_started", "project", project.id, { title: project.title, floorId: floor.id, participants: floor.divisionIds.length });
+    await this.setProjectStatus(project, "in_progress");
+    void this.tickAll();
+    return { ok: true };
+  }
+
+  // Divisi ber-`publish: true` mendapat daftar akun sosial media dan format pengajuan unggahan.
+  private async publishSection(division: DivisionEntity | null) {
+    if (!division?.publish) return "";
+    const accounts = await db.query.socialAccounts.findMany();
+    const list = accounts.length
+      ? accounts.map((a) => `- ${a.id}: ${a.platform} ${a.label}${a.handle ? ` (@${a.handle})` : ""}`).join("\n")
+      : '(belum ada akun terdaftar; isi "akun" dengan "" dan pemilik akan memilih akunnya)';
+    return `
+Pengajuan unggahan sosial media: untuk setiap konten yang siap tayang, tulis satu berkas publikasi/<nama>.json berisi
+{"akun": ["<id akun>", "<id akun lain>"], "caption": "<teks posting umum>", "per_akun": {"<id akun>": "<caption khusus platform ini>"}, "media": ["<path berkas di folder kerja, mis. konten/video/final.mp4>"]}
+Satu konten boleh ke banyak akun sekaligus; sesuaikan caption per platform lewat per_akun (X maks 280 karakter, TikTok dan Instagram boleh lebih panjang dengan hashtag, YouTube baris pertama jadi judul).
+Pastikan media cocok dengan platformnya (TikTok dan YouTube wajib video). media boleh kosong untuk posting teks saja. Jangan mengunggah sendiri; pemilik meninjau lalu menekan tombol unggah. Akun terdaftar:
+${list}
+`;
+  }
+
+  private async taskPrompt(t: Task, division: DivisionEntity | null, workspace: string) {
     const brief = fs.existsSync(path.join(workspace, "brief", "brief.md"))
       ? "\nBrief proyek dan berkas perencanaan dari pemilik ada di folder brief/ (mulai dari brief/brief.md); baca yang relevan.\n"
       : "";
     return `${division?.prompt ?? ""}
-${brief}
+${brief}${await this.publishSection(division)}
 ${t.description}
 Kriteria selesai: ${t.doneCriteria}
 Bekerjalah hanya di dalam folder kerja ini. Akhiri dengan ringkasan singkat hasil kerja.

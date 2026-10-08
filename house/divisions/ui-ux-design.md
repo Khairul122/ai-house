@@ -13,6 +13,7 @@ permission:
   webfetch: allow
 religion: katolik
 order: 2
+floor: software
 persona:
   name: "Maria Clara"
   short: "Desain"

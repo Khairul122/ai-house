@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { useLook } from "../features/office/looks.ts";
 import { STATUS_LABEL } from "../panels/DivisionsPanel.tsx";
-import { type Division, useDivisions } from "../state/store.ts";
+import { useCamera } from "../state/camera.ts";
+import { type Division, useDivisions, useFloors } from "../state/store.ts";
 import { useAgentStatus } from "../state/useAgentStatus.ts";
 
 function Chip({
@@ -54,15 +55,20 @@ function Chip({
 }
 
 // Daftar divisi di sisi kiri: status langsung terlihat, satu klik (atau tombol angka) mendekat ke ruangannya.
+// Mode satu lantai: hanya divisi di lantai itu. Nomor pintasan tetap mengikuti urutan semua divisi.
 export function Roster({ selectedId }: { selectedId: string | null }) {
   const divisions = useDivisions();
+  const level = useCamera((c) => c.floor);
+  const floor = useFloors().find((f) => f.level === level);
   if (!divisions.length) return null;
   return (
     <nav className="roster" aria-label="Divisi">
       <ul>
-        {divisions.map((d, i) => (
-          <Chip key={d.id} d={d} index={i} selected={selectedId === d.id} />
-        ))}
+        {divisions.map((d, i) =>
+          floor && d.floor !== floor.id ? null : (
+            <Chip key={d.id} d={d} index={i} selected={selectedId === d.id} />
+          ),
+        )}
       </ul>
     </nav>
   );

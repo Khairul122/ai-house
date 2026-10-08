@@ -13,6 +13,7 @@ permission:
   webfetch: allow
 religion: islam
 order: 9
+floor: data-security
 persona:
   name: "Bayu Saputra"
   short: "Infra"

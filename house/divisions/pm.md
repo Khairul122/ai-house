@@ -13,6 +13,7 @@ permission:
   webfetch: allow
 religion: islam
 order: 3
+floor: software
 role: coordinator
 persona:
   name: "Raka Pratama"
