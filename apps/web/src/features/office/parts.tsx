@@ -1,6 +1,11 @@
 import type { ThreeElements } from "@react-three/fiber";
 import React from "react";
-import { BoxGeometry, type BufferGeometry, type Mesh, MeshStandardMaterial } from "three";
+import {
+  BoxGeometry,
+  type BufferGeometry,
+  type Mesh,
+  MeshStandardMaterial,
+} from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 export type V3 = [number, number, number];
@@ -29,7 +34,10 @@ function geometryFor(s: V3, round: boolean) {
   const key = `${s.join(",")}|${radius.toFixed(3)}`;
   let g = geometries.get(key);
   if (!g) {
-    g = radius > 0 ? new RoundedBoxGeometry(s[0], s[1], s[2], 2, radius) : new BoxGeometry(...s);
+    g =
+      radius > 0
+        ? new RoundedBoxGeometry(s[0], s[1], s[2], 2, radius)
+        : new BoxGeometry(...s);
     geometries.set(key, g);
   }
   return g;
@@ -39,7 +47,12 @@ export function materialFor(color: string, emissive = "#000000", glow = 0) {
   const key = `${color}|${emissive}|${glow}`;
   let m = materials.get(key);
   if (!m) {
-    m = new MeshStandardMaterial({ color, emissive, emissiveIntensity: glow, roughness: 0.72 });
+    m = new MeshStandardMaterial({
+      color,
+      emissive,
+      emissiveIntensity: glow,
+      roughness: 0.72,
+    });
     materials.set(key, m);
   }
   return m;
@@ -47,7 +60,10 @@ export function materialFor(color: string, emissive = "#000000", glow = 0) {
 
 // Satu kotak. Semua furnitur, bangunan, dan karakter dibangun dari ini.
 // Kotak kecil (mata, buku, detail) tidak ikut menghasilkan bayangan: tak terlihat, tapi mahal.
-export const Box = React.forwardRef<Mesh, BoxProps>(function Box({ p, s, c, emissive, glow = 0, shadow = true, round = true, ...rest }, ref) {
+export const Box = React.forwardRef<Mesh, BoxProps>(function Box(
+  { p, s, c, emissive, glow = 0, shadow = true, round = true, ...rest },
+  ref,
+) {
   const casts = shadow && Math.max(s[0], s[1], s[2]) >= 0.35;
   return (
     <mesh

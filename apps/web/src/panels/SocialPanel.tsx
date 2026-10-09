@@ -1,5 +1,6 @@
 import { Share2 } from "lucide-react";
-import React, { useState } from "react";
+import type React from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Empty,
@@ -113,7 +114,10 @@ function TikTokConnect({ onDone }: { onDone: () => void }) {
   const start = (e: React.FormEvent) => {
     e.preventDefault();
     void run(async () => {
-      const r = await postJson<{ url: string }>("/api/social/connect/tiktok/start", form);
+      const r = await postJson<{ url: string }>(
+        "/api/social/connect/tiktok/start",
+        form,
+      );
       setLink(r.url);
       // rahasia sudah dipegang server (hanya di memori); hapus dari layar
       setForm((f) => ({ ...f, clientSecret: "" }));
@@ -122,7 +126,10 @@ function TikTokConnect({ onDone }: { onDone: () => void }) {
 
   const finish = () =>
     void run(async () => {
-      const r = await postJson<{ scope: string }>("/api/social/connect/tiktok/finish", { redirected: pasted });
+      const r = await postJson<{ scope: string }>(
+        "/api/social/connect/tiktok/finish",
+        { redirected: pasted },
+      );
       setLink(null);
       setPasted("");
       setOkMsg(
@@ -140,22 +147,42 @@ function TikTokConnect({ onDone }: { onDone: () => void }) {
       </summary>
       {okMsg && <p className="text-sm text-ok mt-2">{okMsg}</p>}
       {!link ? (
-        <form onSubmit={start} className="space-y-3 mt-2" noValidate autoComplete="off">
+        <form
+          onSubmit={start}
+          className="space-y-3 mt-2"
+          noValidate
+          autoComplete="off"
+        >
           <p className="text-xs text-ink-muted">
-            Isi Client key dan secret dari portal TikTok. Redirect URI harus <strong>sama persis</strong>
-            dengan yang didaftarkan di portal. Secret hanya ditahan di memori server selama 10 menit.
+            Isi Client key dan secret dari portal TikTok. Redirect URI harus{" "}
+            <strong>sama persis</strong>
+            dengan yang didaftarkan di portal. Secret hanya ditahan di memori
+            server selama 10 menit.
           </p>
           <label className="field">
             <span>Client key *</span>
-            <input value={form.clientKey} onChange={set("clientKey")} autoComplete="off" />
+            <input
+              value={form.clientKey}
+              onChange={set("clientKey")}
+              autoComplete="off"
+            />
           </label>
           <label className="field">
             <span>Client secret *</span>
-            <input type="password" value={form.clientSecret} onChange={set("clientSecret")} autoComplete="off" />
+            <input
+              type="password"
+              value={form.clientSecret}
+              onChange={set("clientSecret")}
+              autoComplete="off"
+            />
           </label>
           <label className="field">
             <span>Redirect URI *</span>
-            <input value={form.redirectUri} onChange={set("redirectUri")} placeholder="https://..." />
+            <input
+              value={form.redirectUri}
+              onChange={set("redirectUri")}
+              placeholder="https://..."
+            />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="field">
@@ -164,15 +191,29 @@ function TikTokConnect({ onDone }: { onDone: () => void }) {
             </label>
             <label className="field">
               <span>Nama *</span>
-              <input value={form.label} onChange={set("label")} maxLength={80} />
+              <input
+                value={form.label}
+                onChange={set("label")}
+                maxLength={80}
+              />
             </label>
           </div>
           <label className="field">
             <span>Username</span>
-            <input value={form.handle} onChange={set("handle")} placeholder="@namaakun" />
+            <input
+              value={form.handle}
+              onChange={set("handle")}
+              placeholder="@namaakun"
+            />
           </label>
           {error && <ErrorNote>{error}</ErrorNote>}
-          <button type="submit" className="btn btn-primary" disabled={busy || !form.clientKey || !form.clientSecret || !form.redirectUri}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={
+              busy || !form.clientKey || !form.clientSecret || !form.redirectUri
+            }
+          >
             {busy ? "Menyiapkan…" : "Buat tautan izin"}
           </button>
         </form>
@@ -181,26 +222,52 @@ function TikTokConnect({ onDone }: { onDone: () => void }) {
           <ol className="list-decimal pl-5 text-sm text-ink space-y-1">
             <li>
               Buka{" "}
-              <a href={link} target="_blank" rel="noreferrer" className="underline">
+              <a
+                href={link}
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
                 tautan izin TikTok
               </a>{" "}
               dan setujui. Login sebagai akun yang akan dipakai memposting.
             </li>
             <li>
-              Browser dialihkan ke Redirect URI Anda. Halamannya boleh error atau kosong; yang dibutuhkan hanya alamatnya.
+              Browser dialihkan ke Redirect URI Anda. Halamannya boleh error
+              atau kosong; yang dibutuhkan hanya alamatnya.
             </li>
-            <li>Salin <strong>seluruh alamat</strong> dari address bar (berisi code= dan state=), tempel di bawah.</li>
+            <li>
+              Salin <strong>seluruh alamat</strong> dari address bar (berisi
+              code= dan state=), tempel di bawah.
+            </li>
           </ol>
           <label className="field">
             <span>Alamat hasil pengalihan</span>
-            <textarea value={pasted} onChange={(e) => setPasted(e.target.value)} rows={3} placeholder="https://...?code=...&state=..." />
+            <textarea
+              value={pasted}
+              onChange={(e) => setPasted(e.target.value)}
+              rows={3}
+              placeholder="https://...?code=...&state=..."
+            />
           </label>
           {error && <ErrorNote>{error}</ErrorNote>}
           <div className="flex gap-2">
-            <button type="button" className="btn btn-primary" onClick={finish} disabled={busy || !pasted.trim()}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={finish}
+              disabled={busy || !pasted.trim()}
+            >
               {busy ? "Menukar kode…" : "Selesaikan"}
             </button>
-            <button type="button" className="btn btn-ghost" onClick={() => { setLink(null); setError(null); }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setLink(null);
+                setError(null);
+              }}
+            >
               Mulai lagi
             </button>
           </div>
@@ -789,7 +856,11 @@ export function SocialPanel() {
         <ManualPost accounts={list} onDone={reload} />
       </div>
       {used.length > 1 && (
-        <div className="flex flex-wrap gap-1.5 mb-2" role="group" aria-label="Filter platform">
+        <div
+          className="flex flex-wrap gap-1.5 mb-2"
+          role="group"
+          aria-label="Filter platform"
+        >
           {["", ...used].map((id) => (
             <button
               key={id || "semua"}
@@ -798,7 +869,11 @@ export function SocialPanel() {
               onClick={() => setPlatform(id)}
               aria-pressed={platform === id}
             >
-              {id === "" ? "Semua" : id === "-" ? "Belum ada akun" : (PLATFORM_SHORT[id] ?? id)}
+              {id === ""
+                ? "Semua"
+                : id === "-"
+                  ? "Belum ada akun"
+                  : (PLATFORM_SHORT[id] ?? id)}
             </button>
           ))}
         </div>

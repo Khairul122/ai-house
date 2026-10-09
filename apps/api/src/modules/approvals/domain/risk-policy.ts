@@ -14,7 +14,7 @@ export class RiskPolicy {
     /curl\s+.*\|\s*sh/i,
     /wget\s+.*\|\s*sh/i,
     /\.ssh/i,
-    /\.\.\/\.\./
+    /\.\.\/\.\./,
   ];
 
   private readonly riskyPatterns = [
@@ -23,57 +23,69 @@ export class RiskPolicy {
     /pnpm\s+(add|install)/i,
     /npm\s+(install|i)/i,
     /deploy/i,
-    /ssh\s+/i
+    /ssh\s+/i,
   ];
 
   // Perintah baca-saja tanpa efek samping: cek versi alat dan melihat isi folder kerja.
   private readonly readOnlyPatterns = [
     /^(node|npm|pnpm|npx|yarn|bun|deno|python3?|pip3?|git|java|go|cargo|rustc)\s+(-v|-V|--version|version)$/i,
-    /^(ls|dir|pwd|whoami)(\s+(-[a-z]+|\.|\.\/))*$/i
+    /^(ls|dir|pwd|whoami)(\s+(-[a-z]+|\.|\.\/))*$/i,
   ];
 
   assessBashCommand(
     command: string,
     customAllow: string[] = [],
     customAsk: string[] = [],
-    customDeny: string[] = []
+    customDeny: string[] = [],
   ): ActionAssessment {
     const trimmed = command.trim();
 
     // Check Level 4 (Forbidden)
-    const isCustomDeny = customDeny.some((pattern) => this.matchWildcard(trimmed, pattern));
+    const isCustomDeny = customDeny.some((pattern) =>
+      this.matchWildcard(trimmed, pattern),
+    );
     for (const pattern of this.forbiddenPatterns) {
       if (isCustomDeny || pattern.test(trimmed)) {
         return {
           riskLevel: 4,
           allowed: false,
           requiresApproval: false,
-          reason: "Forbidden command violation (Level 4)."
+          reason: "Forbidden command violation (Level 4).",
         };
       }
     }
 
     // Check custom ask or built-in risky patterns (Level 3)
-    const isCustomAsk = customAsk.some((pattern) => this.matchWildcard(trimmed, pattern));
-    const isRiskyPattern = this.riskyPatterns.some((pattern) => pattern.test(trimmed));
+    const isCustomAsk = customAsk.some((pattern) =>
+      this.matchWildcard(trimmed, pattern),
+    );
+    const isRiskyPattern = this.riskyPatterns.some((pattern) =>
+      pattern.test(trimmed),
+    );
 
     if (isCustomAsk || isRiskyPattern) {
       return {
         riskLevel: 3,
         allowed: false,
         requiresApproval: true,
-        reason: "Risky operation requires human approval (Level 3)."
+        reason: "Risky operation requires human approval (Level 3).",
       };
     }
 
     // Check custom allow or safe patterns (Level 2)
-    const isCustomAllow = customAllow.some((pattern) => this.matchWildcard(trimmed, pattern));
-    if (isCustomAllow || /^git\s+(status|diff|log)/i.test(trimmed) || this.readOnlyPatterns.some((p) => p.test(trimmed))) {
+    const isCustomAllow = customAllow.some((pattern) =>
+      this.matchWildcard(trimmed, pattern),
+    );
+    if (
+      isCustomAllow ||
+      /^git\s+(status|diff|log)/i.test(trimmed) ||
+      this.readOnlyPatterns.some((p) => p.test(trimmed))
+    ) {
       return {
         riskLevel: 2,
         allowed: true,
         requiresApproval: false,
-        reason: "Permitted execution command (Level 2)."
+        reason: "Permitted execution command (Level 2).",
       };
     }
 
@@ -82,20 +94,26 @@ export class RiskPolicy {
       riskLevel: 3,
       allowed: false,
       requiresApproval: true,
-      reason: "Unrecognized command requires approval (Level 3)."
+      reason: "Unrecognized command requires approval (Level 3).",
     };
   }
 
-  assessWorkspacePath(targetPath: string, workspaceRoot: string): ActionAssessment {
+  assessWorkspacePath(
+    targetPath: string,
+    workspaceRoot: string,
+  ): ActionAssessment {
     const normalizedTarget = targetPath.replace(/\\/g, "/");
     const normalizedRoot = workspaceRoot.replace(/\\/g, "/");
 
-    if (normalizedTarget.includes("..") || !normalizedTarget.startsWith(normalizedRoot)) {
+    if (
+      normalizedTarget.includes("..") ||
+      !normalizedTarget.startsWith(normalizedRoot)
+    ) {
       return {
         riskLevel: 4,
         allowed: false,
         requiresApproval: false,
-        reason: "Path escapes workspace sandbox (Level 4)."
+        reason: "Path escapes workspace sandbox (Level 4).",
       };
     }
 
@@ -103,12 +121,14 @@ export class RiskPolicy {
       riskLevel: 1,
       allowed: true,
       requiresApproval: false,
-      reason: "Workspace write access permitted (Level 1)."
+      reason: "Workspace write access permitted (Level 1).",
     };
   }
 
   private matchWildcard(str: string, rule: string): boolean {
-    const escaped = rule.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+    const escaped = rule
+      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, ".*");
     return new RegExp(`^${escaped}$`, "i").test(str);
   }
 }

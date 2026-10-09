@@ -1,16 +1,33 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, Inject, Param, Post, Put } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Post,
+  Put,
+} from "@nestjs/common";
+import { FileDivisionRepository } from "../../divisions/infrastructure/file-division.repository.js";
 import { OrchestratorService } from "../../orchestrator/orchestrator.service.js";
 import { getAutonomy, setAutonomy } from "../../settings/autonomy.js";
-import { FileDivisionRepository } from "../../divisions/infrastructure/file-division.repository.js";
-import { BriefInputSchema, composeBrief, decodeFiles, writeBrief } from "../application/brief.js";
+import {
+  BriefInputSchema,
+  composeBrief,
+  decodeFiles,
+  writeBrief,
+} from "../application/brief.js";
 import { ProjectService } from "../application/project.service.js";
 
 @Controller("api")
 export class ProjectsController {
   constructor(
     @Inject(ProjectService) private readonly projectService: ProjectService,
-    @Inject(OrchestratorService) private readonly orchestrator: OrchestratorService,
-    @Inject(FileDivisionRepository) private readonly divisions: FileDivisionRepository
+    @Inject(OrchestratorService)
+    private readonly orchestrator: OrchestratorService,
+    @Inject(FileDivisionRepository)
+    private readonly divisions: FileDivisionRepository,
   ) {}
 
   @Get("projects")
@@ -26,7 +43,10 @@ export class ProjectsController {
   @Post("projects")
   async create(@Body() body: unknown) {
     const parsed = BriefInputSchema.safeParse(body);
-    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0]?.message ?? "Isian proyek tidak valid.");
+    if (!parsed.success)
+      throw new BadRequestException(
+        parsed.error.issues[0]?.message ?? "Isian proyek tidak valid.",
+      );
     const input = parsed.data;
     let files: ReturnType<typeof decodeFiles>;
     try {
@@ -35,15 +55,32 @@ export class ProjectsController {
       throw new BadRequestException((e as Error).message);
     }
     const floor = input.floor ? this.divisions.floor(input.floor) : null;
-    if (input.floor && !floor) throw new BadRequestException(`Lantai ${input.floor} tidak dikenal.`);
-    if (floor && !floor.divisionIds.length) throw new BadRequestException(`Lantai ${floor.name} belum punya divisi.`);
-    const outside = floor ? (input.divisions ?? []).filter((d) => !floor.divisionIds.includes(d)) : [];
-    if (outside.length) throw new BadRequestException(`Divisi ${outside.join(", ")} bukan bagian dari lantai ${floor?.name}.`);
-    const project = await this.projectService.createProject(input.title, input.goal, input.tokenBudget, { floorId: floor?.id });
+    if (input.floor && !floor)
+      throw new BadRequestException(`Lantai ${input.floor} tidak dikenal.`);
+    if (floor && !floor.divisionIds.length)
+      throw new BadRequestException(`Lantai ${floor.name} belum punya divisi.`);
+    const outside = floor
+      ? (input.divisions ?? []).filter((d) => !floor.divisionIds.includes(d))
+      : [];
+    if (outside.length)
+      throw new BadRequestException(
+        `Divisi ${outside.join(", ")} bukan bagian dari lantai ${floor?.name}.`,
+      );
+    const project = await this.projectService.createProject(
+      input.title,
+      input.goal,
+      input.tokenBudget,
+      { floorId: floor?.id },
+    );
     const nameOf = (id: string) => this.divisions.loadById(id)?.name ?? id;
-    writeBrief(project.workspacePath, composeBrief(input, files, nameOf, floor?.name), files);
+    writeBrief(
+      project.workspacePath,
+      composeBrief(input, files, nameOf, floor?.name),
+      files,
+    );
     // Mode otomatis: PM langsung mulai merencanakan tanpa perlu ditekan.
-    if ((await getAutonomy()) === "auto") await this.orchestrator.planProject(project.id);
+    if ((await getAutonomy()) === "auto")
+      await this.orchestrator.planProject(project.id);
     return project;
   }
 
@@ -54,15 +91,26 @@ export class ProjectsController {
 
   // Rapat bidang: tiap divisi di lantai menulis masukan, lalu ketua bidang menyusun notulen dan tindak lanjut.
   @Post("floors/:id/meetings")
-  async meeting(@Param("id") id: string, @Body() body: { topic?: string; agenda?: string }) {
+  async meeting(
+    @Param("id") id: string,
+    @Body() body: { topic?: string; agenda?: string },
+  ) {
     const floor = this.divisions.floor(id);
     if (!floor) throw new BadRequestException(`Lantai ${id} tidak dikenal.`);
-    if (!floor.divisionIds.length) throw new BadRequestException(`Lantai ${floor.name} belum punya divisi.`);
+    if (!floor.divisionIds.length)
+      throw new BadRequestException(`Lantai ${floor.name} belum punya divisi.`);
     const topic = body.topic?.trim() ?? "";
     const agenda = body.agenda?.trim() ?? "";
-    if (topic.length < 3 || topic.length > 300) throw new BadRequestException("Topik rapat 3 sampai 300 karakter.");
-    if (agenda.length > 4000) throw new BadRequestException("Agenda maksimal 4000 karakter.");
-    const project = await this.projectService.createProject(`Rapat ${floor.name}: ${topic}`, agenda || topic, undefined, { floorId: floor.id, kind: "meeting" });
+    if (topic.length < 3 || topic.length > 300)
+      throw new BadRequestException("Topik rapat 3 sampai 300 karakter.");
+    if (agenda.length > 4000)
+      throw new BadRequestException("Agenda maksimal 4000 karakter.");
+    const project = await this.projectService.createProject(
+      `Rapat ${floor.name}: ${topic}`,
+      agenda || topic,
+      undefined,
+      { floorId: floor.id, kind: "meeting" },
+    );
     await this.orchestrator.startMeeting(project.id, topic, agenda);
     return project;
   }
@@ -84,7 +132,8 @@ export class ProjectsController {
 
   @Put("settings/autonomy")
   async setMode(@Body() body: { mode?: string }) {
-    if (body.mode !== "auto" && body.mode !== "ask") throw new BadRequestException('mode harus "auto" atau "ask".');
+    if (body.mode !== "auto" && body.mode !== "ask")
+      throw new BadRequestException('mode harus "auto" atau "ask".');
     await setAutonomy(body.mode);
     if (body.mode === "auto") await this.orchestrator.applyAutonomy();
     return { mode: body.mode };

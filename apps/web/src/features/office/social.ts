@@ -40,9 +40,13 @@ function meetingSpot(from: Vec2): Vec2 {
   const inside = zoneAt(from[0], from[1]) !== "outside";
   if (inside) {
     const x = Math.round((Math.random() - 0.5) * 22);
-    return Math.random() < 0.25 ? [12.8, -0.3] : [x, Math.random() < 0.5 ? -0.2 : 0.2 * CORRIDOR_HALF];
+    return Math.random() < 0.25
+      ? [12.8, -0.3]
+      : [x, Math.random() < 0.5 ? -0.2 : 0.2 * CORRIDOR_HALF];
   }
-  return Math.random() < 0.5 ? [PARK.x, PARK.z - 2.6] : [Math.round((Math.random() - 0.5) * 50), PROMENADE_Z + 0.9];
+  return Math.random() < 0.5
+    ? [PARK.x, PARK.z - 2.6]
+    : [Math.round((Math.random() - 0.5) * 50), PROMENADE_Z + 0.9];
 }
 
 // Mengajak satu karakter santai lain ngobrol. Mengembalikan pertemuan, atau null bila tidak ada yang bebas.
@@ -51,7 +55,16 @@ export function proposeChat(id: string, from: Vec2, now: number): Meet | null {
   if (!partners.length || meets.has(id)) return null;
   const b = partners[Math.floor(Math.random() * partners.length)];
   const spot = meetingSpot(from);
-  const meet: Meet = { key: `chat-${++counter}`, a: id, b, spot, zone: zoneAt(spot[0], spot[1]), until: now + 30000, startedAt: 0, arrived: new Set() };
+  const meet: Meet = {
+    key: `chat-${++counter}`,
+    a: id,
+    b,
+    spot,
+    zone: zoneAt(spot[0], spot[1]),
+    until: now + 30000,
+    startedAt: 0,
+    arrived: new Set(),
+  };
   meets.set(id, meet);
   meets.set(b, meet);
   return meet;
@@ -93,7 +106,10 @@ export function placeIn(m: Meet, id: string): { at: Vec2; face: number } {
 const TURN_MS = 2600;
 
 // Siapa yang sedang bicara dan kalimat ke berapa.
-export function turnOf(m: Meet, now: number): { speaker: string; turn: number } | null {
+export function turnOf(
+  m: Meet,
+  now: number,
+): { speaker: string; turn: number } | null {
   if (!m.startedAt) return null;
   const turn = Math.floor((now - m.startedAt) / TURN_MS);
   return { speaker: turn % 2 === 0 ? m.a : m.b, turn };

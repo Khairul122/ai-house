@@ -13,7 +13,7 @@ if (dir && !fs.existsSync(dir)) {
 }
 
 export const sqliteClient = createClient({
-  url: dbUrl.startsWith("file:") ? dbUrl : `file:${dbUrl}`
+  url: dbUrl.startsWith("file:") ? dbUrl : `file:${dbUrl}`,
 });
 
 export const db = drizzle(sqliteClient, { schema });

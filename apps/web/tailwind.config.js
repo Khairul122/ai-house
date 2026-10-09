@@ -12,9 +12,9 @@ export default {
         accent: "var(--accent)",
         ok: "var(--ok)",
         warn: "var(--warn)",
-        danger: "var(--danger)"
-      }
-    }
+        danger: "var(--danger)",
+      },
+    },
   },
-  plugins: []
+  plugins: [],
 };

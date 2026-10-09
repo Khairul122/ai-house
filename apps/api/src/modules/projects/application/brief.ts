@@ -8,7 +8,25 @@ import { z } from "zod";
 export const MAX_FILES = 10;
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 export const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
-export const ALLOWED_EXT = [".md", ".txt", ".json", ".csv", ".yaml", ".yml", ".html", ".css", ".pdf", ".docx", ".xlsx", ".pptx", ".png", ".jpg", ".jpeg", ".webp", ".svg"];
+export const ALLOWED_EXT = [
+  ".md",
+  ".txt",
+  ".json",
+  ".csv",
+  ".yaml",
+  ".yml",
+  ".html",
+  ".css",
+  ".pdf",
+  ".docx",
+  ".xlsx",
+  ".pptx",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".svg",
+];
 
 const text = (max: number) => z.string().trim().max(max).optional();
 
@@ -25,9 +43,11 @@ export const BriefInputSchema = z.object({
   notes: text(4000),
   tokenBudget: z.number().int().positive().optional(),
   files: z
-    .array(z.object({ name: z.string().min(1).max(200), contentBase64: z.string() }))
+    .array(
+      z.object({ name: z.string().min(1).max(200), contentBase64: z.string() }),
+    )
     .max(MAX_FILES, `Maksimal ${MAX_FILES} berkas.`)
-    .optional()
+    .optional(),
 });
 export type BriefInput = z.infer<typeof BriefInputSchema>;
 
@@ -43,7 +63,8 @@ export function safeFileName(name: string, taken: Set<string>): string {
     .slice(0, 80);
   if (!stem || stem.toLowerCase() === "brief") stem = "berkas";
   let candidate = `${stem}${ext}`;
-  for (let i = 2; taken.has(candidate.toLowerCase()); i++) candidate = `${stem}-${i}${ext}`;
+  for (let i = 2; taken.has(candidate.toLowerCase()); i++)
+    candidate = `${stem}-${i}${ext}`;
   taken.add(candidate.toLowerCase());
   return candidate;
 }
@@ -59,20 +80,35 @@ export function decodeFiles(files: BriefInput["files"]): DecodedFile[] {
   let total = 0;
   return (files ?? []).map((f) => {
     const ext = path.extname(f.name).toLowerCase();
-    if (!ALLOWED_EXT.includes(ext)) throw new Error(`Jenis berkas ${ext || "(tanpa ekstensi)"} tidak didukung: ${f.name}`);
+    if (!ALLOWED_EXT.includes(ext))
+      throw new Error(
+        `Jenis berkas ${ext || "(tanpa ekstensi)"} tidak didukung: ${f.name}`,
+      );
     const data = Buffer.from(f.contentBase64, "base64");
-    if (data.length > MAX_FILE_BYTES) throw new Error(`${f.name} lebih dari 10 MB.`);
+    if (data.length > MAX_FILE_BYTES)
+      throw new Error(`${f.name} lebih dari 10 MB.`);
     total += data.length;
-    if (total > MAX_TOTAL_BYTES) throw new Error("Total berkas lebih dari 25 MB.");
+    if (total > MAX_TOTAL_BYTES)
+      throw new Error("Total berkas lebih dari 25 MB.");
     return { name: safeFileName(f.name, taken), data };
   });
 }
 
-const PRIORITY: Record<string, string> = { normal: "Normal", tinggi: "Tinggi", mendesak: "Mendesak" };
+const PRIORITY: Record<string, string> = {
+  normal: "Normal",
+  tinggi: "Tinggi",
+  mendesak: "Mendesak",
+};
 const kb = (n: number) => (n < 1024 ? `${n} B` : `${Math.round(n / 1024)} KB`);
 
-export function composeBrief(input: BriefInput, files: DecodedFile[], divisionName: (id: string) => string, floorName?: string): string {
-  const section = (title: string, body?: string) => (body?.trim() ? `\n## ${title}\n${body.trim()}\n` : "");
+export function composeBrief(
+  input: BriefInput,
+  files: DecodedFile[],
+  divisionName: (id: string) => string,
+  floorName?: string,
+): string {
+  const section = (title: string, body?: string) =>
+    body?.trim() ? `\n## ${title}\n${body.trim()}\n` : "";
   return [
     `# Brief proyek: ${input.title}\n`,
     section("Tujuan", input.goal),
@@ -81,14 +117,35 @@ export function composeBrief(input: BriefInput, files: DecodedFile[], divisionNa
     section("Teknologi dan batasan", input.constraints),
     section("Gaya dan nuansa", input.style),
     section("Prioritas", input.priority ? PRIORITY[input.priority] : undefined),
-    section("Bidang (lantai)", floorName ? `${floorName}. Hanya divisi di bidang ini yang mengerjakan proyek.` : undefined),
-    section("Divisi yang dilibatkan", input.divisions?.length ? input.divisions.map((d) => `- ${divisionName(d)} (${d})`).join("\n") : undefined),
+    section(
+      "Bidang (lantai)",
+      floorName
+        ? `${floorName}. Hanya divisi di bidang ini yang mengerjakan proyek.`
+        : undefined,
+    ),
+    section(
+      "Divisi yang dilibatkan",
+      input.divisions?.length
+        ? input.divisions.map((d) => `- ${divisionName(d)} (${d})`).join("\n")
+        : undefined,
+    ),
     section("Catatan tambahan", input.notes),
-    section("Berkas pendukung", files.length ? files.map((f) => `- brief/${f.name} (${kb(f.data.length)})`).join("\n") : undefined)
+    section(
+      "Berkas pendukung",
+      files.length
+        ? files
+            .map((f) => `- brief/${f.name} (${kb(f.data.length)})`)
+            .join("\n")
+        : undefined,
+    ),
   ].join("");
 }
 
-export function writeBrief(workspace: string, brief: string, files: DecodedFile[]) {
+export function writeBrief(
+  workspace: string,
+  brief: string,
+  files: DecodedFile[],
+) {
   const dir = path.join(workspace, "brief");
   fs.mkdirSync(dir, { recursive: true });
   for (const f of files) fs.writeFileSync(path.join(dir, f.name), f.data);
@@ -99,5 +156,7 @@ export function readBrief(workspace: string, maxChars = 8000): string | null {
   const file = path.join(workspace, "brief", "brief.md");
   if (!fs.existsSync(file)) return null;
   const text = fs.readFileSync(file, "utf-8");
-  return text.length > maxChars ? `${text.slice(0, maxChars)}\n…(dipotong, baca brief/brief.md untuk lengkapnya)` : text;
+  return text.length > maxChars
+    ? `${text.slice(0, maxChars)}\n…(dipotong, baca brief/brief.md untuk lengkapnya)`
+    : text;
 }

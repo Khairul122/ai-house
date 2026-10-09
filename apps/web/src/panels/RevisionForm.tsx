@@ -4,7 +4,11 @@ import { useLook } from "../features/office/looks.ts";
 import { postJson } from "../lib/hooks.ts";
 
 // Meminta divisi memperbaiki hasil kerjanya. House membuat tugas "Revisi n: …" yang langsung dikerjakan.
-export function RevisionForm({ taskId, divisionId, onSent }: { taskId: string; divisionId: string; onSent?: () => void }) {
+export function RevisionForm({
+  taskId,
+  divisionId,
+  onSent,
+}: { taskId: string; divisionId: string; onSent?: () => void }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -13,11 +17,21 @@ export function RevisionForm({ taskId, divisionId, onSent }: { taskId: string; d
   const id = useId();
   const name = useLook(divisionId).name;
 
-  if (sent) return <p className="text-xs text-ok basis-full">Revisi dikirim ke {name}. Dikerjakan otomatis; hasilnya muncul sebagai tugas "Revisi".</p>;
+  if (sent)
+    return (
+      <p className="text-xs text-ok basis-full">
+        Revisi dikirim ke {name}. Dikerjakan otomatis; hasilnya muncul sebagai
+        tugas "Revisi".
+      </p>
+    );
 
   if (!open) {
     return (
-      <button type="button" className="btn btn-sm btn-ghost" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="btn btn-sm btn-ghost"
+        onClick={() => setOpen(true)}
+      >
         Minta revisi
       </button>
     );
@@ -56,10 +70,19 @@ export function RevisionForm({ taskId, divisionId, onSent }: { taskId: string; d
       />
       {error && <ErrorNote>{error}</ErrorNote>}
       <div className="flex gap-2">
-        <button type="submit" className="btn btn-sm btn-primary" disabled={busy}>
+        <button
+          type="submit"
+          className="btn btn-sm btn-primary"
+          disabled={busy}
+        >
           {busy ? "Mengirim…" : "Kirim revisi"}
         </button>
-        <button type="button" className="btn btn-sm btn-ghost" onClick={() => setOpen(false)} disabled={busy}>
+        <button
+          type="button"
+          className="btn btn-sm btn-ghost"
+          onClick={() => setOpen(false)}
+          disabled={busy}
+        >
           Batal
         </button>
       </div>

@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { claim, leaveMeet, markArrived, meetOf, placeIn, proposeChat, releaseAll, setAvailable, turnOf } from "./social.ts";
+import {
+  claim,
+  leaveMeet,
+  markArrived,
+  meetOf,
+  placeIn,
+  proposeChat,
+  releaseAll,
+  setAvailable,
+  turnOf,
+} from "./social.ts";
 
 describe("social", () => {
   it("ngobrol hanya dengan karakter yang bebas, bergiliran setelah keduanya tiba", () => {

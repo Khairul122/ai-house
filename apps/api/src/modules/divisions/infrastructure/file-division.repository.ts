@@ -1,9 +1,13 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import crypto from "node:crypto";
+import {
+  type DivisionConfig,
+  DivisionConfigSchema,
+  FloorSchema,
+} from "@ai-house/shared";
 import { Injectable } from "@nestjs/common";
 import YAML from "yaml";
-import { DivisionConfigSchema, type DivisionConfig, FloorSchema } from "@ai-house/shared";
 
 export interface DivisionEntity {
   id: string;
@@ -40,9 +44,11 @@ export class FileDivisionRepository {
     const candidates = [
       path.resolve(process.cwd(), "house/divisions"),
       path.resolve(process.cwd(), "../../house/divisions"),
-      path.resolve(process.cwd(), "../house/divisions")
+      path.resolve(process.cwd(), "../house/divisions"),
     ];
-    this.divisionsDir = candidates.find((dir) => fs.existsSync(dir)) || path.resolve(process.cwd(), "house/divisions");
+    this.divisionsDir =
+      candidates.find((dir) => fs.existsSync(dir)) ||
+      path.resolve(process.cwd(), "house/divisions");
   }
 
   loadAll(): DivisionEntity[] {
@@ -50,7 +56,9 @@ export class FileDivisionRepository {
       return [];
     }
 
-    const files = fs.readdirSync(this.divisionsDir).filter((f) => f.endsWith(".md"));
+    const files = fs
+      .readdirSync(this.divisionsDir)
+      .filter((f) => f.endsWith(".md"));
     return files
       .map((file) => this.loadFile(path.join(this.divisionsDir, file)))
       .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
@@ -60,7 +68,9 @@ export class FileDivisionRepository {
   private floorDefs() {
     const file = path.join(this.divisionsDir, "..", "floors.yaml");
     if (!fs.existsSync(file)) return [DEFAULT_FLOOR];
-    const list = FloorSchema.array().parse(YAML.parse(fs.readFileSync(file, "utf-8")) ?? []);
+    const list = FloorSchema.array().parse(
+      YAML.parse(fs.readFileSync(file, "utf-8")) ?? [],
+    );
     return list.length ? list : [DEFAULT_FLOOR];
   }
 
@@ -70,7 +80,12 @@ export class FileDivisionRepository {
     return this.floorDefs().map((f, level) => {
       const members = all.filter((d) => d.floor === f.id);
       const lead = members.find((d) => d.role === "coordinator") ?? members[0];
-      return { ...f, level, leadId: lead?.id ?? null, divisionIds: members.map((d) => d.id) };
+      return {
+        ...f,
+        level,
+        leadId: lead?.id ?? null,
+        divisionIds: members.map((d) => d.id),
+      };
     });
   }
 
@@ -88,7 +103,9 @@ export class FileDivisionRepository {
   // selain itu koordinator utama.
   planner(floorId?: string | null): DivisionEntity | null {
     if (floorId) {
-      const lead = this.loadAll().find((d) => d.floor === floorId && d.role === "coordinator");
+      const lead = this.loadAll().find(
+        (d) => d.floor === floorId && d.role === "coordinator",
+      );
       if (lead) return lead;
     }
     return this.coordinator();
@@ -111,15 +128,22 @@ export class FileDivisionRepository {
   }
 
   // Mengganti (atau menambah) satu baris `kunci: nilai` tingkat atas di frontmatter tanpa menyentuh isi lain.
-  setField(id: string, key: "model" | "religion", value: string): DivisionEntity | null {
+  setField(
+    id: string,
+    key: "model" | "religion",
+    value: string,
+  ): DivisionEntity | null {
     const filePath = path.join(this.divisionsDir, `${id}.md`);
     if (!fs.existsSync(filePath)) return null;
     const raw = fs.readFileSync(filePath, "utf-8");
     const end = raw.indexOf("\n---", 3);
-    if (!raw.startsWith("---") || end < 0) throw new Error(`Frontmatter ${id}.md tidak valid.`);
+    if (!raw.startsWith("---") || end < 0)
+      throw new Error(`Frontmatter ${id}.md tidak valid.`);
     const head = raw.slice(0, end);
     const line = new RegExp(`^${key}:.*$`, "m");
-    const nextHead = line.test(head) ? head.replace(line, `${key}: ${value}`) : `${head}\n${key}: ${value}`;
+    const nextHead = line.test(head)
+      ? head.replace(line, `${key}: ${value}`)
+      : `${head}\n${key}: ${value}`;
     fs.writeFileSync(filePath, nextHead + raw.slice(end));
     return this.loadFile(filePath);
   }
@@ -130,10 +154,13 @@ export class FileDivisionRepository {
 
     const parsed = DivisionConfigSchema.parse({
       ...frontmatter,
-      prompt: body.trim()
+      prompt: body.trim(),
     });
 
-    const promptHash = crypto.createHash("sha256").update(parsed.prompt).digest("hex");
+    const promptHash = crypto
+      .createHash("sha256")
+      .update(parsed.prompt)
+      .digest("hex");
     const floors = this.floorDefs();
 
     return {
@@ -142,22 +169,30 @@ export class FileDivisionRepository {
       description: parsed.description,
       model: parsed.model,
       role: parsed.role,
-      floor: floors.some((f) => f.id === parsed.floor) ? (parsed.floor as string) : floors[0].id,
+      floor: floors.some((f) => f.id === parsed.floor)
+        ? (parsed.floor as string)
+        : floors[0].id,
       publish: parsed.publish,
       order: parsed.order,
       religion: parsed.religion,
       persona: parsed.persona,
       prompt: parsed.prompt,
       promptHash,
-      permission: parsed.permission
+      permission: parsed.permission,
     };
   }
 
-  private parseFrontmatter(content: string): { frontmatter: Record<string, unknown>; body: string } {
+  private parseFrontmatter(content: string): {
+    frontmatter: Record<string, unknown>;
+    body: string;
+  } {
     const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
     if (!match) return { frontmatter: {}, body: content };
     const parsed = YAML.parse(match[1]) as unknown;
-    const frontmatter = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+    const frontmatter =
+      parsed && typeof parsed === "object"
+        ? (parsed as Record<string, unknown>)
+        : {};
     return { frontmatter, body: match[2] };
   }
 }

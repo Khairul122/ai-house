@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { DivisionConfigSchema, ProjectPlanSchema, RiskLevelSchema } from "../src/schemas/index.js";
+import {
+  DivisionConfigSchema,
+  ProjectPlanSchema,
+  RiskLevelSchema,
+} from "../src/schemas/index.js";
 
 describe("Shared Schemas", () => {
   it("validates risk levels", () => {
@@ -18,9 +22,9 @@ describe("Shared Schemas", () => {
           divisionId: "ui-ux",
           description: "Desain wireframe",
           doneCriteria: "Ada spec.md",
-          dependsOnTitles: []
-        }
-      ]
+          dependsOnTitles: [],
+        },
+      ],
     };
     expect(ProjectPlanSchema.safeParse(validPlan).success).toBe(true);
   });
@@ -37,11 +41,11 @@ describe("Shared Schemas", () => {
         bash: {
           allow: ["git status"],
           ask: ["git push"],
-          deny: ["rm -rf /"]
+          deny: ["rm -rf /"],
         },
-        webfetch: "allow"
+        webfetch: "allow",
       },
-      prompt: "Kamu adalah PM."
+      prompt: "Kamu adalah PM.",
     };
     expect(DivisionConfigSchema.safeParse(validDivision).success).toBe(true);
   });

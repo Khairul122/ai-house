@@ -1,6 +1,8 @@
 import { Html } from "@react-three/drei";
 import { useState } from "react";
 import type { Floor } from "../../state/store.ts";
+import { Glass, Wall } from "./Room.tsx";
+import { StaticBatch } from "./StaticBatch.tsx";
 import {
   CORRIDOR_HALF,
   FLOOR_H,
@@ -14,8 +16,6 @@ import {
 import { MAT, TONES, tint, toneAt } from "./looks.ts";
 import { Box } from "./parts.tsx";
 import { BigPlant, glassMaterial } from "./props.tsx";
-import { Glass, Wall } from "./Room.tsx";
-import { StaticBatch } from "./StaticBatch.tsx";
 
 const SLAB = 0.12;
 const PILLAR_X = [-16.3, -8.1, 0, 8.1, 16.3];

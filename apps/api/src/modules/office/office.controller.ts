@@ -18,7 +18,7 @@ export function listPendingApprovals() {
       actionSummary: approvals.actionSummary,
       expiresAt: approvals.expiresAt,
       divisionId: tasks.divisionId,
-      taskTitle: tasks.title
+      taskTitle: tasks.title,
     })
     .from(approvals)
     .leftJoin(runs, eq(approvals.runId, runs.id))
@@ -32,20 +32,28 @@ export class OfficeController {
     @Inject(FileDivisionRepository)
     private readonly divisionRepo: FileDivisionRepository,
     @Inject(AuditService)
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
   ) {}
 
   @Get("office")
   async office() {
     const divisionIds = this.divisionRepo.loadAll().map((d) => d.id);
     const taskRows = await db.query.tasks.findMany();
-    return deriveOfficeState(divisionIds, taskRows, await listPendingApprovals());
+    return deriveOfficeState(
+      divisionIds,
+      taskRows,
+      await listPendingApprovals(),
+    );
   }
 
   // Profil kantor dan divisi koordinatornya, dipakai dashboard menggantikan nilai tetap di kode.
   @Get("house")
   house() {
-    return { ...getHouseProfile(), coordinatorId: this.divisionRepo.coordinatorId(), planTaskTitle: PLAN_TASK_TITLE };
+    return {
+      ...getHouseProfile(),
+      coordinatorId: this.divisionRepo.coordinatorId(),
+      planTaskTitle: PLAN_TASK_TITLE,
+    };
   }
 
   @Get("audit")

@@ -46,23 +46,50 @@ interface TokenResponse {
   error_description?: string;
 }
 
-export async function tiktokFinish(redirected: string, fetchFn: typeof fetch = fetch) {
+export async function tiktokFinish(
+  redirected: string,
+  fetchFn: typeof fetch = fetch,
+) {
   const q = parseRedirect(redirected);
-  if (q.get("error")) throw new BadRequestException(`TikTok menolak izin: ${q.get("error_description") || q.get("error")}`);
+  if (q.get("error"))
+    throw new BadRequestException(
+      `TikTok menolak izin: ${q.get("error_description") || q.get("error")}`,
+    );
   const code = q.get("code");
   const state = q.get("state") ?? "";
-  if (!code) throw new BadRequestException("Alamat yang ditempel tidak berisi code=. Salin seluruh alamat dari address bar setelah menyetujui izin.");
+  if (!code)
+    throw new BadRequestException(
+      "Alamat yang ditempel tidak berisi code=. Salin seluruh alamat dari address bar setelah menyetujui izin.",
+    );
   const p = pending.get(state);
-  if (!p || p.expires < Date.now()) throw new BadRequestException("Sesi hubungkan tidak ditemukan atau sudah lewat 10 menit. Mulai lagi dari 'Buat tautan izin'.");
+  if (!p || p.expires < Date.now())
+    throw new BadRequestException(
+      "Sesi hubungkan tidak ditemukan atau sudah lewat 10 menit. Mulai lagi dari 'Buat tautan izin'.",
+    );
   pending.delete(state); // kode hanya berlaku sekali
   const res = await fetchFn(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_key: p.clientKey, client_secret: p.clientSecret, code, grant_type: "authorization_code", redirect_uri: p.redirectUri })
+    body: new URLSearchParams({
+      client_key: p.clientKey,
+      client_secret: p.clientSecret,
+      code,
+      grant_type: "authorization_code",
+      redirect_uri: p.redirectUri,
+    }),
   });
   const body = (await res.json().catch(() => ({}))) as TokenResponse;
   if (!res.ok || !body.access_token) {
-    throw new BadRequestException(`TikTok menolak penukaran kode: ${body.error_description || body.error || `HTTP ${res.status}`}. Kode berlaku sekali dan singkat, ulangi dari awal.`);
+    throw new BadRequestException(
+      `TikTok menolak penukaran kode: ${body.error_description || body.error || `HTTP ${res.status}`}. Kode berlaku sekali dan singkat, ulangi dari awal.`,
+    );
   }
-  return { pending: p, tokens: { accessToken: body.access_token, refreshToken: body.refresh_token ?? "", scope: body.scope ?? "" } };
+  return {
+    pending: p,
+    tokens: {
+      accessToken: body.access_token,
+      refreshToken: body.refresh_token ?? "",
+      scope: body.scope ?? "",
+    },
+  };
 }

@@ -1,18 +1,36 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
-import { Color, type DirectionalLight, FogExp2, type HemisphereLight, type InstancedMesh, type Mesh, type OrthographicCamera, Object3D, type PointLight, MeshStandardMaterial, ShaderMaterial, Vector3 } from "three";
+import {
+  Color,
+  type DirectionalLight,
+  FogExp2,
+  type HemisphereLight,
+  type InstancedMesh,
+  type Mesh,
+  MeshStandardMaterial,
+  Object3D,
+  type OrthographicCamera,
+  type PointLight,
+  ShaderMaterial,
+  Vector3,
+} from "three";
 import { play, setRain } from "../../lib/sound.ts";
 import { camera as view } from "../../state/camera.ts";
 import { env, useEnv } from "../../state/env.ts";
 import { useFloors } from "../../state/store.ts";
-import { lightingFor, type Phase, type Weather } from "./environment.ts";
+import { type Phase, type Weather, lightingFor } from "./environment.ts";
 import { CAMPUS_HALF_X, CAMPUS_HALF_Z, FLOOR_H } from "./layout.ts";
 
 // Lampu koridor tiap lantai (x), menyala malam atau saat hujan.
 const LAMP_X = [-10, 0, 10, 15.5];
 
 // Keadaan suasana yang dibaca komponen lain setiap frame (lampu, karakter).
-export const atmo = { lamp: 0, rain: 0, weather: "cerah" as Weather, phase: "siang" as Phase };
+export const atmo = {
+  lamp: 0,
+  rain: 0,
+  weather: "cerah" as Weather,
+  phase: "siang" as Phase,
+};
 
 const DROPS = 1500;
 const RAIN_TOP = 26;
@@ -26,9 +44,9 @@ function Rain() {
         x: (Math.random() - 0.5) * CAMPUS_HALF_X * 2,
         y: Math.random() * RAIN_TOP,
         z: (Math.random() - 0.5) * CAMPUS_HALF_Z * 2,
-        v: 18 + Math.random() * 8
+        v: 18 + Math.random() * 8,
       })),
-    []
+    [],
   );
 
   useFrame((_, delta) => {
@@ -51,7 +69,11 @@ function Rain() {
   });
 
   return (
-    <instancedMesh ref={mesh} args={[undefined, undefined, DROPS]} frustumCulled={false}>
+    <instancedMesh
+      ref={mesh}
+      args={[undefined, undefined, DROPS]}
+      frustumCulled={false}
+    >
       <boxGeometry args={[0.03, 0.55, 0.03]} />
       <meshBasicMaterial color="#C9D6E2" transparent opacity={0.55} />
     </instancedMesh>
@@ -64,13 +86,21 @@ const CLOUDS: [number, number, number, number][] = [
   [10, 23, -25, 1.4],
   [32, 26, 8, 1.1],
   [50, 24, -18, 0.9],
-  [-55, 27, 28, 1.3]
+  [-55, 27, 28, 1.3],
 ];
 
 const CLOUD_GREY = new Color("#9AA3AD");
 const CLOUD_WHITE = new Color("#FFFFFF");
 // Satu material per awan; ketiga gumpalannya berbagi material itu (warnanya berubah bersama).
-const cloudMaterials = CLOUDS.map(() => new MeshStandardMaterial({ color: "#FFFFFF", transparent: true, opacity: 0.92, roughness: 1 }));
+const cloudMaterials = CLOUDS.map(
+  () =>
+    new MeshStandardMaterial({
+      color: "#FFFFFF",
+      transparent: true,
+      opacity: 0.92,
+      roughness: 1,
+    }),
+);
 
 function Clouds() {
   const group = useRef<import("three").Group>(null);
@@ -79,10 +109,12 @@ function Clouds() {
     if (!g) return;
     const grey = atmo.weather === "hujan" || atmo.weather === "dingin";
     for (const c of g.children) {
-      c.position.x += Math.min(delta, 0.05) * (atmo.weather === "hujan" ? 2.2 : 0.9);
+      c.position.x +=
+        Math.min(delta, 0.05) * (atmo.weather === "hujan" ? 2.2 : 0.9);
       if (c.position.x > 70) c.position.x = -70;
       c.visible = atmo.weather !== "panas" || c.position.z > 0; // cuaca panas: langit lebih bersih
-      const mat = (c.children[0] as import("three").Mesh).material as import("three").MeshStandardMaterial;
+      const mat = (c.children[0] as import("three").Mesh)
+        .material as import("three").MeshStandardMaterial;
       mat.color.lerp(grey ? CLOUD_GREY : CLOUD_WHITE, 0.02);
     }
   });
@@ -94,10 +126,18 @@ function Clouds() {
           <mesh scale={[3.4, 1.3, 2.2]} material={cloudMaterials[i]}>
             <sphereGeometry args={[1, 16, 10]} />
           </mesh>
-          <mesh position={[2.3, 0.5, 0.2]} scale={[2.2, 1.4, 1.7]} material={cloudMaterials[i]}>
+          <mesh
+            position={[2.3, 0.5, 0.2]}
+            scale={[2.2, 1.4, 1.7]}
+            material={cloudMaterials[i]}
+          >
             <sphereGeometry args={[1, 16, 10]} />
           </mesh>
-          <mesh position={[-2.2, 0.15, -0.2]} scale={[1.8, 1, 1.4]} material={cloudMaterials[i]}>
+          <mesh
+            position={[-2.2, 0.15, -0.2]}
+            scale={[1.8, 1, 1.4]}
+            material={cloudMaterials[i]}
+          >
             <sphereGeometry args={[1, 16, 10]} />
           </mesh>
         </group>
@@ -109,12 +149,16 @@ function Clouds() {
 // Langit bergradasi: bidang selebar layar yang selalu ditempel di belakang kamera ortografis.
 // (Kamera ortografis tidak punya perspektif, jadi gradasi dibuat di ruang layar, bukan bola langit.)
 const skyMaterial = new ShaderMaterial({
-  uniforms: { top: { value: new Color("#9CC3EE") }, bottom: { value: new Color("#EAF2FB") } },
-  vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  uniforms: {
+    top: { value: new Color("#9CC3EE") },
+    bottom: { value: new Color("#EAF2FB") },
+  },
+  vertexShader:
+    "varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
   fragmentShader:
     "uniform vec3 top; uniform vec3 bottom; varying vec2 vUv; void main() { gl_FragColor = vec4(mix(bottom, top, smoothstep(0.0, 1.0, vUv.y)), 1.0); #include <tonemapping_fragment>\n #include <colorspace_fragment>\n }",
   depthWrite: false,
-  fog: false
+  fog: false,
 });
 
 function Sky() {
@@ -126,10 +170,19 @@ function Sky() {
     m.position.copy(cam.position);
     m.quaternion.copy(cam.quaternion);
     m.translateZ(-(cam.far - 5));
-    m.scale.set((cam.right - cam.left) / cam.zoom + 2, (cam.top - cam.bottom) / cam.zoom + 2, 1);
+    m.scale.set(
+      (cam.right - cam.left) / cam.zoom + 2,
+      (cam.top - cam.bottom) / cam.zoom + 2,
+      1,
+    );
   });
   return (
-    <mesh ref={ref} material={skyMaterial} renderOrder={-1000} frustumCulled={false}>
+    <mesh
+      ref={ref}
+      material={skyMaterial}
+      renderOrder={-1000}
+      frustumCulled={false}
+    >
       <planeGeometry args={[1, 1]} />
     </mesh>
   );
@@ -142,7 +195,16 @@ export function Atmosphere() {
   const sun = useRef<DirectionalLight>(null);
   const hemi = useRef<HemisphereLight>(null);
   const night = useRef<PointLight[]>([]);
-  const target = useMemo(() => ({ sky: new Color(), sun: new Color(), hs: new Color(), hg: new Color(), pos: new Vector3() }), []);
+  const target = useMemo(
+    () => ({
+      sky: new Color(),
+      sun: new Color(),
+      hs: new Color(),
+      hg: new Color(),
+      pos: new Vector3(),
+    }),
+    [],
+  );
   const nextAmbient = useRef(0);
   const sound = useEnv((s) => s.sound);
   const levels = Math.max(1, useFloors().length);
@@ -193,7 +255,8 @@ export function Atmosphere() {
     // lantai di atas lantai yang dilihat disembunyikan, lampunya ikut padam agar tidak menyinari dari atas
     const top = view.get().floor ?? Number.POSITIVE_INFINITY;
     night.current.forEach((p, i) => {
-      if (p) p.intensity = Math.floor(i / LAMP_X.length) > top ? 0 : atmo.lamp * 14;
+      if (p)
+        p.intensity = Math.floor(i / LAMP_X.length) > top ? 0 : atmo.lamp * 14;
     });
 
     // suara sekitar: hujan terus-menerus, burung siang hari, jangkrik malam hari
@@ -236,7 +299,7 @@ export function Atmosphere() {
             distance={9}
             decay={1.6}
           />
-        ))
+        )),
       )}
       <Sky />
       <Rain />

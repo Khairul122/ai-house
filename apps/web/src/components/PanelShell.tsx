@@ -1,5 +1,6 @@
 import { type LucideIcon, X } from "lucide-react";
-import React, { useEffect, useId, useRef } from "react";
+import type React from "react";
+import { useEffect, useId, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 interface Props {
@@ -24,15 +25,31 @@ export function PanelShell({ title, subtitle, children }: Props) {
   }, [navigate]);
 
   return (
-    <aside ref={ref} className="panel" role="dialog" aria-labelledby={titleId} tabIndex={-1}>
+    <aside
+      ref={ref}
+      className="panel"
+      role="dialog"
+      aria-labelledby={titleId}
+      tabIndex={-1}
+    >
       <header className="panel-head">
         <div className="min-w-0">
-          <h2 id={titleId} className="font-display text-xl text-ink leading-tight">
+          <h2
+            id={titleId}
+            className="font-display text-xl text-ink leading-tight"
+          >
             {title}
           </h2>
-          {subtitle && <div className="text-sm text-ink-muted mt-0.5">{subtitle}</div>}
+          {subtitle && (
+            <div className="text-sm text-ink-muted mt-0.5">{subtitle}</div>
+          )}
         </div>
-        <button type="button" className="icon-btn" onClick={() => navigate("/")} aria-label="Tutup panel">
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => navigate("/")}
+          aria-label="Tutup panel"
+        >
           <X className="w-4 h-4" />
         </button>
       </header>
@@ -52,7 +69,11 @@ export function Loading({ label }: { label: string }) {
   );
 }
 
-export function Empty({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children?: React.ReactNode }) {
+export function Empty({
+  icon: Icon,
+  title,
+  children,
+}: { icon: LucideIcon; title: string; children?: React.ReactNode }) {
   return (
     <div className="empty">
       <span className="empty-icon" aria-hidden>

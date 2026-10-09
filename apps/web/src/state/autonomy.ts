@@ -22,7 +22,7 @@ export function useAutonomy(): Autonomy {
       listeners.add(l);
       return () => listeners.delete(l);
     },
-    () => mode
+    () => mode,
   );
 }
 
@@ -30,7 +30,7 @@ export async function setAutonomy(next: Autonomy) {
   const r = await fetchJson<{ mode: Autonomy }>("/api/settings/autonomy", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: next })
+    body: JSON.stringify({ mode: next }),
   });
   set(r.mode);
 }

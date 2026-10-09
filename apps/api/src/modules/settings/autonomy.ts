@@ -9,12 +9,17 @@ export type Autonomy = "auto" | "ask";
 const KEY = "autonomy";
 
 export async function getAutonomy(): Promise<Autonomy> {
-  const row = await db.query.settings.findFirst({ where: eq(settings.key, KEY) });
+  const row = await db.query.settings.findFirst({
+    where: eq(settings.key, KEY),
+  });
   if (row) return JSON.parse(row.valueJson) === "ask" ? "ask" : "auto";
   return process.env.AUTONOMY === "ask" ? "ask" : "auto";
 }
 
 export async function setAutonomy(mode: Autonomy) {
   const valueJson = JSON.stringify(mode);
-  await db.insert(settings).values({ key: KEY, valueJson }).onConflictDoUpdate({ target: settings.key, set: { valueJson } });
+  await db
+    .insert(settings)
+    .values({ key: KEY, valueJson })
+    .onConflictDoUpdate({ target: settings.key, set: { valueJson } });
 }

@@ -1,5 +1,15 @@
-import { BadGatewayException, BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Patch } from "@nestjs/common";
 import { ReligionSchema } from "@ai-house/shared";
+import {
+  BadGatewayException,
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Inject,
+  NotFoundException,
+  Param,
+  Patch,
+} from "@nestjs/common";
 import { desc, eq } from "drizzle-orm";
 import { db } from "../../../db/index.js";
 import { projects, tasks } from "../../../db/schema/index.js";
@@ -17,20 +27,39 @@ let cache: { at: number; models: RouterModel[] } | null = null;
 // Daftar model dari 9router, kombo di atas. Disimpan 60 detik agar dropdown tidak membebani router.
 export async function listRouterModels(): Promise<RouterModel[]> {
   if (cache && Date.now() - cache.at < 60_000) return cache.models;
-  const base = (process.env.NINEROUTER_BASE_URL || "http://127.0.0.1:20128/v1").replace(/\/$/, "");
+  const base = (
+    process.env.NINEROUTER_BASE_URL || "http://127.0.0.1:20128/v1"
+  ).replace(/\/$/, "");
   let res: Response;
   try {
     res = await fetch(`${base}/models`, {
-      headers: process.env.NINEROUTER_API_KEY ? { Authorization: `Bearer ${process.env.NINEROUTER_API_KEY}` } : {}
+      headers: process.env.NINEROUTER_API_KEY
+        ? { Authorization: `Bearer ${process.env.NINEROUTER_API_KEY}` }
+        : {},
     });
   } catch {
-    throw new BadGatewayException(`9router di ${base} tidak terjangkau. Jalankan 9router dulu.`);
+    throw new BadGatewayException(
+      `9router di ${base} tidak terjangkau. Jalankan 9router dulu.`,
+    );
   }
-  if (!res.ok) throw new BadGatewayException(`9router menolak permintaan daftar model (HTTP ${res.status}).`);
-  const body = (await res.json()) as { data?: { id: string; owned_by?: string }[] };
+  if (!res.ok)
+    throw new BadGatewayException(
+      `9router menolak permintaan daftar model (HTTP ${res.status}).`,
+    );
+  const body = (await res.json()) as {
+    data?: { id: string; owned_by?: string }[];
+  };
   const models = (body.data ?? [])
-    .map((m) => ({ id: `9router/${m.id}`, name: m.id, combo: m.owned_by === "combo", owner: m.owned_by ?? "" }))
-    .sort((a, b) => Number(b.combo) - Number(a.combo) || a.name.localeCompare(b.name));
+    .map((m) => ({
+      id: `9router/${m.id}`,
+      name: m.id,
+      combo: m.owned_by === "combo",
+      owner: m.owned_by ?? "",
+    }))
+    .sort(
+      (a, b) =>
+        Number(b.combo) - Number(a.combo) || a.name.localeCompare(b.name),
+    );
   cache = { at: Date.now(), models };
   return models;
 }
@@ -39,7 +68,7 @@ export async function listRouterModels(): Promise<RouterModel[]> {
 export class DivisionsController {
   constructor(
     @Inject(FileDivisionRepository)
-    private readonly divisionRepo: FileDivisionRepository
+    private readonly divisionRepo: FileDivisionRepository,
   ) {}
 
   @Get("divisions")
@@ -65,7 +94,7 @@ export class DivisionsController {
         resultSummary: tasks.resultSummary,
         updatedAt: tasks.updatedAt,
         projectId: projects.id,
-        projectTitle: projects.title
+        projectTitle: projects.title,
       })
       .from(tasks)
       .innerJoin(projects, eq(tasks.projectId, projects.id))
@@ -80,17 +109,28 @@ export class DivisionsController {
   }
 
   @Patch("divisions/:id")
-  async update(@Param("id") id: string, @Body() body: { model?: string; religion?: string }) {
-    if (!body.model && !body.religion) throw new BadRequestException("Isi model atau religion.");
-    if (!this.divisionRepo.loadById(id)) throw new NotFoundException("Divisi tidak ditemukan.");
+  async update(
+    @Param("id") id: string,
+    @Body() body: { model?: string; religion?: string },
+  ) {
+    if (!body.model && !body.religion)
+      throw new BadRequestException("Isi model atau religion.");
+    if (!this.divisionRepo.loadById(id))
+      throw new NotFoundException("Divisi tidak ditemukan.");
     if (body.religion !== undefined) {
       const religion = ReligionSchema.safeParse(body.religion);
-      if (!religion.success) throw new BadRequestException(`Agama tidak dikenal. Pilih: ${ReligionSchema.options.join(", ")}.`);
+      if (!religion.success)
+        throw new BadRequestException(
+          `Agama tidak dikenal. Pilih: ${ReligionSchema.options.join(", ")}.`,
+        );
       this.divisionRepo.setField(id, "religion", religion.data);
     }
     if (body.model !== undefined) {
       const known = await listRouterModels();
-      if (!known.some((m) => m.id === body.model)) throw new BadRequestException(`Model ${body.model} tidak ada di 9router.`);
+      if (!known.some((m) => m.id === body.model))
+        throw new BadRequestException(
+          `Model ${body.model} tidak ada di 9router.`,
+        );
       this.divisionRepo.setField(id, "model", body.model);
     }
     return this.divisionRepo.loadById(id);

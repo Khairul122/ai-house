@@ -26,7 +26,7 @@ interface PendingApprovalRow {
 export function deriveOfficeState(
   divisionIds: string[],
   taskRows: TaskRow[],
-  pending: PendingApprovalRow[]
+  pending: PendingApprovalRow[],
 ): OfficeAgentState[] {
   return divisionIds.map((divisionId) => {
     const own = taskRows
@@ -44,11 +44,16 @@ export function deriveOfficeState(
         divisionId,
         status: "waiting",
         task,
-        approval: { id: approval.id, summary: approval.actionSummary, riskLevel: approval.riskLevel }
+        approval: {
+          id: approval.id,
+          summary: approval.actionSummary,
+          riskLevel: approval.riskLevel,
+        },
       };
     }
     if (running) return { divisionId, status: "working", task, approval: null };
-    if (latest?.status === "failed") return { divisionId, status: "failed", task, approval: null };
+    if (latest?.status === "failed")
+      return { divisionId, status: "failed", task, approval: null };
     return { divisionId, status: "idle", task: null, approval: null };
   });
 }

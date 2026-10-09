@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { z } from "zod";
 import type {
   ApprovalDecisionInputSchema,
   ApprovalStatusSchema,
@@ -10,7 +10,7 @@ import type {
   ProjectPlanSchema,
   ProjectStatusSchema,
   RiskLevelSchema,
-  TaskStatusSchema
+  TaskStatusSchema,
 } from "../schemas/index.js";
 
 export type RiskLevel = z.infer<typeof RiskLevelSchema>;

@@ -1,5 +1,14 @@
-import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
+import type React from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useMatch,
+  useNavigate,
+} from "react-router-dom";
 import { BottomNav } from "../components/BottomNav.tsx";
 import { CommandPalette } from "../components/CommandPalette.tsx";
 import { Hud } from "../components/Hud.tsx";

@@ -3,9 +3,23 @@
 
 export type Need = "energi" | "sosial" | "hiburan" | "spiritual";
 export type Needs = Record<Need, number>; // 0..100
-export type Emotion = "senang" | "fokus" | "santai" | "lelah" | "bosan" | "kesepian" | "cemas" | "sedih" | "khusyuk";
+export type Emotion =
+  | "senang"
+  | "fokus"
+  | "santai"
+  | "lelah"
+  | "bosan"
+  | "kesepian"
+  | "cemas"
+  | "sedih"
+  | "khusyuk";
 
-export const NEED_LABEL: Record<Need, string> = { energi: "Energi", sosial: "Sosial", hiburan: "Hiburan", spiritual: "Spiritual" };
+export const NEED_LABEL: Record<Need, string> = {
+  energi: "Energi",
+  sosial: "Sosial",
+  hiburan: "Hiburan",
+  spiritual: "Spiritual",
+};
 export const EMOTION_LABEL: Record<Emotion, string> = {
   senang: "Senang",
   fokus: "Fokus",
@@ -15,11 +29,21 @@ export const EMOTION_LABEL: Record<Emotion, string> = {
   kesepian: "Kesepian",
   cemas: "Cemas",
   sedih: "Sedih",
-  khusyuk: "Khusyuk"
+  khusyuk: "Khusyuk",
 };
 
 // Kegiatan yang sedang dilakukan, untuk menghitung perubahan kebutuhan.
-export type Doing = "kerja" | "tidur" | "kopi" | "ngobrol" | "berenang" | "membaca" | "taman" | "ibadah" | "jalan" | "diam";
+export type Doing =
+  | "kerja"
+  | "tidur"
+  | "kopi"
+  | "ngobrol"
+  | "berenang"
+  | "membaca"
+  | "taman"
+  | "ibadah"
+  | "jalan"
+  | "diam";
 
 // Perubahan per menit. Positif mengisi, negatif menguras.
 const RATE: Record<Doing, Partial<Needs>> = {
@@ -32,7 +56,7 @@ const RATE: Record<Doing, Partial<Needs>> = {
   taman: { hiburan: 8, energi: 1, sosial: 1 },
   ibadah: { spiritual: 30, energi: 0.5, hiburan: 0.5 },
   jalan: { energi: -0.6, hiburan: 0.5, sosial: -0.6, spiritual: -0.3 },
-  diam: { energi: -0.3, hiburan: -0.9, sosial: -0.8, spiritual: -0.3 }
+  diam: { energi: -0.3, hiburan: -0.9, sosial: -0.8, spiritual: -0.3 },
 };
 
 export function stepNeeds(n: Needs, doing: Doing, minutes: number): Needs {
@@ -42,7 +66,7 @@ export function stepNeeds(n: Needs, doing: Doing, minutes: number): Needs {
     energi: clamp(n.energi + (r.energi ?? 0) * minutes),
     sosial: clamp(n.sosial + (r.sosial ?? 0) * minutes),
     hiburan: clamp(n.hiburan + (r.hiburan ?? 0) * minutes),
-    spiritual: clamp(n.spiritual + (r.spiritual ?? 0) * minutes)
+    spiritual: clamp(n.spiritual + (r.spiritual ?? 0) * minutes),
   };
 }
 
@@ -82,7 +106,11 @@ export function simOf(id: string): SimState {
   let s = sims.get(id);
   if (!s) {
     const r = () => 55 + Math.random() * 35;
-    s = { needs: { energi: r(), sosial: r(), hiburan: r(), spiritual: r() }, emotion: "santai", activity: "Santai di ruangannya" };
+    s = {
+      needs: { energi: r(), sosial: r(), hiburan: r(), spiritual: r() },
+      emotion: "santai",
+      activity: "Santai di ruangannya",
+    };
     sims.set(id, s);
   }
   return s;

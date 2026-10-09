@@ -1,6 +1,10 @@
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
-import { CanvasTexture, type MeshStandardMaterial, SRGBColorSpace } from "three";
+import {
+  CanvasTexture,
+  type MeshStandardMaterial,
+  SRGBColorSpace,
+} from "three";
 import { useHouse } from "../../state/store.ts";
 import { atmo } from "./Atmosphere.tsx";
 import { TONES } from "./looks.ts";
@@ -52,7 +56,8 @@ function useInscription(name: string) {
       const fit = (text: string, weight: number, size: number) => {
         g.font = `${weight} ${size}px ${family}`;
         const width = g.measureText(text).width;
-        if (width > 860) g.font = `${weight} ${Math.floor((size * 860) / width)}px ${family}`;
+        if (width > 860)
+          g.font = `${weight} ${Math.floor((size * 860) / width)}px ${family}`;
       };
       fit(top, 700, 190);
       g.fillText(top, canvas.width / 2, bottom ? 520 : 640);
@@ -74,7 +79,10 @@ function useInscription(name: string) {
   return texture;
 }
 
-export function Monument({ position, rotation = 0 }: { position: [number, number, number]; rotation?: number }) {
+export function Monument({
+  position,
+  rotation = 0,
+}: { position: [number, number, number]; rotation?: number }) {
   const texture = useInscription(useHouse()?.name ?? "AI House");
   const glow = useRef<MeshStandardMaterial>(null);
   useFrame(() => {
@@ -92,12 +100,23 @@ export function Monument({ position, rotation = 0 }: { position: [number, number
       <Box p={[0, 5.35, 0]} s={[2.7, 0.3, 1.35]} c={STONE_DARK} />
       <mesh position={[0, 5.9, 0]} castShadow>
         <coneGeometry args={[0.95, 0.8, 4]} />
-        <meshStandardMaterial color={TONES[0]} roughness={0.45} metalness={0.1} />
+        <meshStandardMaterial
+          color={TONES[0]}
+          roughness={0.45}
+          metalness={0.1}
+        />
       </mesh>
       {/* prasasti di muka depan (+z) */}
       <mesh position={[0, 3.05, 0.56]} userData={{ dynamic: true }}>
         <planeGeometry args={[2.1, 2.62]} />
-        <meshStandardMaterial ref={glow} map={texture} emissive="#FFFFFF" emissiveMap={texture} emissiveIntensity={0.15} roughness={0.8} />
+        <meshStandardMaterial
+          ref={glow}
+          map={texture}
+          emissive="#FFFFFF"
+          emissiveMap={texture}
+          emissiveIntensity={0.15}
+          roughness={0.8}
+        />
       </mesh>
       {/* lampu sorot kecil di kaki tugu */}
       {[-1.3, 1.3].map((x) => (

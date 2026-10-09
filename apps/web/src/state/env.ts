@@ -1,5 +1,11 @@
 import { useEffect, useSyncExternalStore } from "react";
-import { type Phase, PHASE_START, phaseOf, type Weather, weatherFrom } from "../features/office/environment.ts";
+import {
+  PHASE_START,
+  type Phase,
+  type Weather,
+  phaseOf,
+  weatherFrom,
+} from "../features/office/environment.ts";
 import { whenHouse } from "./store.ts";
 
 // Suasana kantor: jam (nyata atau simulasi), cuaca (nyata dari Open-Meteo atau pilihan), dan suara.
@@ -17,7 +23,9 @@ const PREF_KEY = "ai-house-env";
 
 function loadPrefs(): Partial<EnvState> {
   try {
-    return JSON.parse(localStorage.getItem(PREF_KEY) ?? "{}") as Partial<EnvState>;
+    return JSON.parse(
+      localStorage.getItem(PREF_KEY) ?? "{}",
+    ) as Partial<EnvState>;
   } catch {
     return {};
   }
@@ -31,7 +39,7 @@ let state: EnvState = {
   autoWeather: "cerah",
   tempC: null,
   sound: prefs.sound ?? false,
-  tick: 0
+  tick: 0,
 };
 const listeners = new Set<() => void>();
 
@@ -39,7 +47,10 @@ function set(patch: Partial<EnvState>) {
   state = { ...state, ...patch };
   for (const l of listeners) l();
   try {
-    localStorage.setItem(PREF_KEY, JSON.stringify({ weatherMode: state.weatherMode, sound: state.sound }));
+    localStorage.setItem(
+      PREF_KEY,
+      JSON.stringify({ weatherMode: state.weatherMode, sound: state.sound }),
+    );
   } catch {
     // penyimpanan peramban tidak tersedia: preferensi hanya berlaku sampai halaman ditutup
   }
@@ -48,7 +59,8 @@ function set(patch: Partial<EnvState>) {
 export const env = {
   get: () => state,
   now: () => new Date(Date.now() + state.offsetMs),
-  weather: (): Weather => (state.weatherMode === "auto" ? state.autoWeather : state.weatherMode),
+  weather: (): Weather =>
+    state.weatherMode === "auto" ? state.autoWeather : state.weatherMode,
   phase: (): Phase => phaseOf(env.now()),
   setPhase(p: Phase | null) {
     if (!p) return set({ phaseOverride: null, offsetMs: 0 });
@@ -62,7 +74,7 @@ export const env = {
   subscribe(l: () => void) {
     listeners.add(l);
     return () => listeners.delete(l);
-  }
+  },
 };
 
 export function useEnv<T>(select: (s: EnvState) => T): T {
@@ -77,11 +89,20 @@ async function fetchWeather() {
       latitude: String(house.latitude),
       longitude: String(house.longitude),
       current: "temperature_2m,weather_code",
-      timezone: house.timezone
+      timezone: house.timezone,
     });
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`);
-    const body = (await res.json()) as { current?: { temperature_2m: number; weather_code: number } };
-    if (body.current) set({ autoWeather: weatherFrom(body.current.weather_code, body.current.temperature_2m), tempC: Math.round(body.current.temperature_2m) });
+    const body = (await res.json()) as {
+      current?: { temperature_2m: number; weather_code: number };
+    };
+    if (body.current)
+      set({
+        autoWeather: weatherFrom(
+          body.current.weather_code,
+          body.current.temperature_2m,
+        ),
+        tempC: Math.round(body.current.temperature_2m),
+      });
   } catch {
     // tanpa internet: tetap memakai cuaca terakhir
   }

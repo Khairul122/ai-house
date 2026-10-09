@@ -12,8 +12,12 @@ describe("kebutuhan", () => {
   });
 
   it("ngobrol mengisi sosial, ibadah mengisi spiritual", () => {
-    expect(stepNeeds({ ...full, sosial: 10 }, "ngobrol", 2).sosial).toBeGreaterThan(40);
-    expect(stepNeeds({ ...full, spiritual: 10 }, "ibadah", 2).spiritual).toBe(70);
+    expect(
+      stepNeeds({ ...full, sosial: 10 }, "ngobrol", 2).sosial,
+    ).toBeGreaterThan(40);
+    expect(stepNeeds({ ...full, spiritual: 10 }, "ibadah", 2).spiritual).toBe(
+      70,
+    );
   });
 
   it("kebutuhan terendah dan suasana hati", () => {
@@ -27,7 +31,9 @@ describe("emosi", () => {
     expect(emotionOf(full, "failed", "diam")).toBe("sedih");
     expect(emotionOf(full, "waiting", "diam")).toBe("cemas");
     expect(emotionOf(full, "working", "kerja")).toBe("fokus");
-    expect(emotionOf({ ...full, energi: 10 }, "working", "kerja")).toBe("lelah");
+    expect(emotionOf({ ...full, energi: 10 }, "working", "kerja")).toBe(
+      "lelah",
+    );
   });
 
   it("saat santai mengikuti kebutuhan", () => {

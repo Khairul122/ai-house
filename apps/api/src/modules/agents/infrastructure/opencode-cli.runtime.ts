@@ -1,5 +1,9 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import type { AgentRuntime, RunEvent, StartRunInput } from "../domain/agent-runtime.port.js";
+import { type ChildProcess, spawn } from "node:child_process";
+import type {
+  AgentRuntime,
+  RunEvent,
+  StartRunInput,
+} from "../domain/agent-runtime.port.js";
 
 export class OpenCodeCliRuntime implements AgentRuntime {
   private processes = new Map<string, ChildProcess>();
@@ -11,15 +15,22 @@ export class OpenCodeCliRuntime implements AgentRuntime {
     // Command: opencode run -m <model> --prompt "<prompt>" in workspacePath
     const child = spawn(
       "opencode",
-      ["run", "-m", input.model, "--prompt", `${input.prompt}\n\nTugas: ${input.taskTitle}\n${input.taskDescription}`],
+      [
+        "run",
+        "-m",
+        input.model,
+        "--prompt",
+        `${input.prompt}\n\nTugas: ${input.taskTitle}\n${input.taskDescription}`,
+      ],
       {
         cwd: input.workspacePath,
         shell: true,
         env: {
           ...process.env,
-          NINEROUTER_BASE_URL: process.env.NINEROUTER_BASE_URL || "http://localhost:20128/v1"
-        }
-      }
+          NINEROUTER_BASE_URL:
+            process.env.NINEROUTER_BASE_URL || "http://localhost:20128/v1",
+        },
+      },
     );
 
     this.processes.set(input.runId, child);
@@ -40,7 +51,10 @@ export class OpenCodeCliRuntime implements AgentRuntime {
         if (code === 0) {
           cb({ type: "done", summary: `Tugas ${input.taskTitle} selesai.` });
         } else {
-          cb({ type: "error", message: `Eksekusi selesai dengan kode error ${code}.` });
+          cb({
+            type: "error",
+            message: `Eksekusi selesai dengan kode error ${code}.`,
+          });
         }
       }
     });
@@ -59,7 +73,11 @@ export class OpenCodeCliRuntime implements AgentRuntime {
     }
   }
 
-  async respondPermission(_runId: string, _permissionId: string, _decision: "allow" | "deny"): Promise<void> {
+  async respondPermission(
+    _runId: string,
+    _permissionId: string,
+    _decision: "allow" | "deny",
+  ): Promise<void> {
     // OpenCode CLI non-interactive mode fallback
   }
 

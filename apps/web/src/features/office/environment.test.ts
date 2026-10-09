@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { lightingFor, phaseOf, weatherFrom, worshipUntil } from "./environment.ts";
+import {
+  lightingFor,
+  phaseOf,
+  weatherFrom,
+  worshipUntil,
+} from "./environment.ts";
 
 const day = (h: number, m = 0, date = "2026-10-08") => {
   const d = new Date(`${date}T00:00:00`);
@@ -20,7 +25,9 @@ describe("waktu", () => {
     expect(lightingFor("malam", "cerah").lamps).toBe(true);
     expect(lightingFor("siang", "hujan").lamps).toBe(true);
     expect(lightingFor("siang", "cerah").lamps).toBe(false);
-    expect(lightingFor("siang", "hujan").sun).toBeLessThan(lightingFor("siang", "cerah").sun);
+    expect(lightingFor("siang", "hujan").sun).toBeLessThan(
+      lightingFor("siang", "cerah").sun,
+    );
   });
 });
 

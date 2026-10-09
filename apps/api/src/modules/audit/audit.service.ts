@@ -5,7 +5,13 @@ import { auditLog } from "../../db/schema/index.js";
 
 @Injectable()
 export class AuditService {
-  async record(actor: string, eventType: string, subjectType: string, subjectId: string, detail: Record<string, any>): Promise<void> {
+  async record(
+    actor: string,
+    eventType: string,
+    subjectType: string,
+    subjectId: string,
+    detail: Record<string, any>,
+  ): Promise<void> {
     await db.insert(auditLog).values({
       id: ulid(),
       actor,
@@ -13,14 +19,14 @@ export class AuditService {
       subjectType,
       subjectId,
       detailJson: JSON.stringify(detail),
-      occurredAt: new Date().toISOString()
+      occurredAt: new Date().toISOString(),
     });
   }
 
-  async listRecent(limit: number = 50) {
+  async listRecent(limit = 50) {
     return db.query.auditLog.findMany({
       limit,
-      orderBy: (audit, { desc }) => [desc(audit.occurredAt)]
+      orderBy: (audit, { desc }) => [desc(audit.occurredAt)],
     });
   }
 }

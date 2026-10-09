@@ -2,7 +2,15 @@ import { EventEmitter } from "node:events";
 import { Injectable } from "@nestjs/common";
 
 export interface SystemEvent {
-  type: "division.status" | "task.updated" | "run.event" | "approval.created" | "approval.decided" | "project.updated" | "task.dispatched" | "social.updated";
+  type:
+    | "division.status"
+    | "task.updated"
+    | "run.event"
+    | "approval.created"
+    | "approval.decided"
+    | "project.updated"
+    | "task.dispatched"
+    | "social.updated";
   payload: any;
   timestamp: string;
 }
@@ -15,7 +23,7 @@ export class EventBusService {
     const event: SystemEvent = {
       type,
       payload,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
     this.emitter.emit("system-event", event);
   }

@@ -10,7 +10,9 @@ import { EventBusService } from "../../events/event-bus.service.js";
 
 // Proyek disimpan di WORKSPACES_DIR (mis. D:\real-aihouse) dengan nama folder yang mudah dikenali.
 export function workspaceFor(id: string, title: string) {
-  const base = process.env.WORKSPACES_DIR ? path.resolve(process.env.WORKSPACES_DIR) : path.resolve("./workspaces");
+  const base = process.env.WORKSPACES_DIR
+    ? path.resolve(process.env.WORKSPACES_DIR)
+    : path.resolve("./workspaces");
   const slug = title
     .toLowerCase()
     .normalize("NFKD")
@@ -26,11 +28,16 @@ export class ProjectService {
     @Inject(AuditService)
     private readonly auditService: AuditService,
     @Inject(EventBusService)
-    private readonly eventBus: EventBusService
+    private readonly eventBus: EventBusService,
   ) {}
 
   // `floorId`: proyek untuk satu bidang (lantai); kosong = seluruh gedung. `kind`: "meeting" untuk rapat bidang.
-  async createProject(title: string, goal: string, tokenBudget?: number, opts: { floorId?: string | null; kind?: "project" | "meeting" } = {}) {
+  async createProject(
+    title: string,
+    goal: string,
+    tokenBudget?: number,
+    opts: { floorId?: string | null; kind?: "project" | "meeting" } = {},
+  ) {
     const id = ulid();
     const workspacePath = workspaceFor(id, title);
 
@@ -50,11 +57,17 @@ export class ProjectService {
       floorId: opts.floorId ?? null,
       kind: opts.kind ?? "project",
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     await db.insert(projects).values(newProject);
-    await this.auditService.record("system", newProject.kind === "meeting" ? "meeting_created" : "project_created", "project", id, { title, goal, floorId: newProject.floorId });
+    await this.auditService.record(
+      "system",
+      newProject.kind === "meeting" ? "meeting_created" : "project_created",
+      "project",
+      id,
+      { title, goal, floorId: newProject.floorId },
+    );
     this.eventBus.publish("project.updated", newProject);
 
     return newProject;
@@ -62,7 +75,7 @@ export class ProjectService {
 
   async getProject(id: string) {
     return db.query.projects.findFirst({
-      where: eq(projects.id, id)
+      where: eq(projects.id, id),
     });
   }
 
@@ -71,13 +84,13 @@ export class ProjectService {
     return db.query.projects.findMany({
       where: eq(projects.kind, "meeting"),
       orderBy: (p, { desc }) => [desc(p.createdAt)],
-      limit: 30
+      limit: 30,
     });
   }
 
   async listProjects() {
     return db.query.projects.findMany({
-      orderBy: (p, { desc }) => [desc(p.createdAt)]
+      orderBy: (p, { desc }) => [desc(p.createdAt)],
     });
   }
 }

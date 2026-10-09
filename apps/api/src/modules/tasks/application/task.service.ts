@@ -7,7 +7,7 @@ import { taskDependencies, tasks } from "../../../db/schema/index.js";
 export class TaskService {
   async listProjectTasks(projectId: string) {
     return db.query.tasks.findMany({
-      where: eq(tasks.projectId, projectId)
+      where: eq(tasks.projectId, projectId),
     });
   }
 
@@ -18,9 +18,18 @@ export class TaskService {
     if (!queued.length) return [];
 
     const deps = await db.query.taskDependencies.findMany({
-      where: inArray(taskDependencies.taskId, queued.map((t) => t.id))
+      where: inArray(
+        taskDependencies.taskId,
+        queued.map((t) => t.id),
+      ),
     });
-    const done = new Set(allTasks.filter((t) => t.status === "done").map((t) => t.id));
-    return queued.filter((t) => deps.filter((d) => d.taskId === t.id).every((d) => done.has(d.dependsOnId)));
+    const done = new Set(
+      allTasks.filter((t) => t.status === "done").map((t) => t.id),
+    );
+    return queued.filter((t) =>
+      deps
+        .filter((d) => d.taskId === t.id)
+        .every((d) => done.has(d.dependsOnId)),
+    );
   }
 }

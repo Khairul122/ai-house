@@ -23,7 +23,6 @@ const SLOTS = 8;
 // Satu slot busur. Slot tetap dipasang dan disembunyikan saat kosong, jadi tidak ada render ulang
 // React selama animasi; posisi dan warna diubah langsung di useFrame.
 function FlowSlot({ index }: { index: number }) {
-  // biome-ignore lint/suspicious/noExplicitAny: tipe ref Line2 dari drei tidak diekspor
   const line = useRef<any>(null);
   const pulse = useRef<Mesh>(null);
   const ring = useRef<Mesh>(null);

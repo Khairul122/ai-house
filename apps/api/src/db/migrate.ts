@@ -141,8 +141,12 @@ export async function migrateDb() {
   // Kolom yang ditambahkan setelah rilis awal; database lama mendapatkannya di sini.
   const projectCols = await sqliteClient.execute("PRAGMA table_info(projects)");
   const has = new Set(projectCols.rows.map((r) => String(r.name)));
-  if (!has.has("floor_id")) await sqliteClient.execute("ALTER TABLE projects ADD COLUMN floor_id TEXT");
-  if (!has.has("kind")) await sqliteClient.execute("ALTER TABLE projects ADD COLUMN kind TEXT NOT NULL DEFAULT 'project'");
+  if (!has.has("floor_id"))
+    await sqliteClient.execute("ALTER TABLE projects ADD COLUMN floor_id TEXT");
+  if (!has.has("kind"))
+    await sqliteClient.execute(
+      "ALTER TABLE projects ADD COLUMN kind TEXT NOT NULL DEFAULT 'project'",
+    );
   console.log("Database tables initialized successfully.");
 }
 

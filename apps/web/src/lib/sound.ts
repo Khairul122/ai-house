@@ -27,9 +27,14 @@ function ready(): AudioContext | null {
   return ctx;
 }
 
-if (typeof window !== "undefined") window.addEventListener("pointerdown", () => ready(), { passive: true });
+if (typeof window !== "undefined")
+  window.addEventListener("pointerdown", () => ready(), { passive: true });
 
-function tone(freq: number, dur: number, o: { type?: OscillatorType; vol?: number; delay?: number; to?: number } = {}) {
+function tone(
+  freq: number,
+  dur: number,
+  o: { type?: OscillatorType; vol?: number; delay?: number; to?: number } = {},
+) {
   const c = ready();
   if (!c || !master) return;
   const t = c.currentTime + (o.delay ?? 0);
@@ -46,7 +51,16 @@ function tone(freq: number, dur: number, o: { type?: OscillatorType; vol?: numbe
   osc.stop(t + dur + 0.05);
 }
 
-function noise(dur: number, o: { vol?: number; freq?: number; type?: BiquadFilterType; delay?: number; swell?: boolean } = {}) {
+function noise(
+  dur: number,
+  o: {
+    vol?: number;
+    freq?: number;
+    type?: BiquadFilterType;
+    delay?: number;
+    swell?: boolean;
+  } = {},
+) {
   const c = ready();
   if (!c || !master || !noiseBuf) return;
   const t = c.currentTime + (o.delay ?? 0);
@@ -57,7 +71,10 @@ function noise(dur: number, o: { vol?: number; freq?: number; type?: BiquadFilte
   f.frequency.value = o.freq ?? 1000;
   const g = c.createGain();
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(o.vol ?? 0.15, t + (o.swell ? dur * 0.5 : 0.01));
+  g.gain.exponentialRampToValueAtTime(
+    o.vol ?? 0.15,
+    t + (o.swell ? dur * 0.5 : 0.01),
+  );
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   src.connect(f).connect(g).connect(master);
   src.start(t);
@@ -66,7 +83,9 @@ function noise(dur: number, o: { vol?: number; freq?: number; type?: BiquadFilte
 
 // Lonceng / gong: beberapa nada dengan peluruhan panjang.
 function struck(partials: number[], dur: number, vol: number) {
-  partials.forEach((f, i) => tone(f, dur * (1 - i * 0.15), { vol: vol / (i + 1) }));
+  partials.forEach((f, i) =>
+    tone(f, dur * (1 - i * 0.15), { vol: vol / (i + 1) }),
+  );
 }
 
 export type SoundName =
@@ -93,7 +112,9 @@ export function play(name: SoundName, volume = 1) {
   if (v < 0.03 || !env.get().sound) return;
   switch (name) {
     case "done":
-      [523, 659, 784].forEach((f, i) => tone(f, 0.25, { vol: 0.16 * v, delay: i * 0.09 }));
+      [523, 659, 784].forEach((f, i) =>
+        tone(f, 0.25, { vol: 0.16 * v, delay: i * 0.09 }),
+      );
       break;
     case "approval":
       tone(880, 0.18, { type: "triangle", vol: 0.16 * v });
@@ -110,11 +131,22 @@ export function play(name: SoundName, volume = 1) {
       break;
     case "chat": {
       const base = 260 + Math.random() * 220;
-      for (let i = 0; i < 3; i++) tone(base * (0.85 + Math.random() * 0.4), 0.07, { type: "triangle", vol: 0.07 * v, delay: i * 0.09 });
+      for (let i = 0; i < 3; i++)
+        tone(base * (0.85 + Math.random() * 0.4), 0.07, {
+          type: "triangle",
+          vol: 0.07 * v,
+          delay: i * 0.09,
+        });
       break;
     }
     case "type":
-      for (let i = 0; i < 3; i++) noise(0.03, { vol: 0.05 * v, freq: 3500, type: "highpass", delay: i * 0.07 + Math.random() * 0.03 });
+      for (let i = 0; i < 3; i++)
+        noise(0.03, {
+          vol: 0.05 * v,
+          freq: 3500,
+          type: "highpass",
+          delay: i * 0.07 + Math.random() * 0.03,
+        });
       break;
     case "splash":
       noise(0.5, { vol: 0.14 * v, freq: 900 });
@@ -140,7 +172,8 @@ export function play(name: SoundName, volume = 1) {
       tone(3000, 0.08, { vol: 0.04 * v, to: 3900, delay: 0.14 });
       break;
     case "cricket":
-      for (let i = 0; i < 4; i++) tone(4300, 0.025, { vol: 0.03 * v, delay: i * 0.05 });
+      for (let i = 0; i < 4; i++)
+        tone(4300, 0.025, { vol: 0.03 * v, delay: i * 0.05 });
       break;
     case "sip":
       noise(0.18, { vol: 0.04 * v, freq: 1800, type: "bandpass" });

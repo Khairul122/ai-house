@@ -1,12 +1,45 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "files": {
+    "ignore": [
+      "**/dist/**",
+      "**/data/**",
+      "**/workspaces/**",
+      "**/_backup-ui-lama/**",
+      "**/node_modules/**"
+    ]
+  },
+  "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    }
+  },
   "organizeImports": {
     "enabled": true
   },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "a11y": {
+        "useSemanticElements": "off",
+        "useKeyWithClickEvents": "off",
+        "useFocusableInteractive": "off",
+        "noNoninteractiveElementToInteractiveRole": "off",
+        "useValidAriaRole": "off"
+      },
+      "correctness": {
+        "useExhaustiveDependencies": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "off",
+        "noAssignInExpressions": "off",
+        "noArrayIndexKey": "off"
+      },
+      "style": {
+        "noNonNullAssertion": "off",
+        "noParameterAssign": "off"
+      }
     }
   },
   "formatter": {

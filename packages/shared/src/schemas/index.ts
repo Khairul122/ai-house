@@ -5,7 +5,7 @@ export const RiskLevelSchema = z.union([
   z.literal(1),
   z.literal(2),
   z.literal(3),
-  z.literal(4)
+  z.literal(4),
 ]);
 
 export const TaskStatusSchema = z.enum([
@@ -15,7 +15,7 @@ export const TaskStatusSchema = z.enum([
   "blocked",
   "done",
   "failed",
-  "cancelled"
+  "cancelled",
 ]);
 
 export const ProjectStatusSchema = z.enum([
@@ -25,21 +25,39 @@ export const ProjectStatusSchema = z.enum([
   "in_progress",
   "completed",
   "failed",
-  "cancelled"
+  "cancelled",
 ]);
 
 export const ApprovalStatusSchema = z.enum([
   "pending",
   "approved",
   "rejected",
-  "expired"
+  "expired",
 ]);
 
-export const ReligionSchema = z.enum(["islam", "protestan", "katolik", "hindu", "buddha", "konghucu"]);
+export const ReligionSchema = z.enum([
+  "islam",
+  "protestan",
+  "katolik",
+  "hindu",
+  "buddha",
+  "konghucu",
+]);
 
 export const DivisionRoleSchema = z.enum(["coordinator", "member"]);
 
-export const AccessorySchema = z.enum(["hardhat", "glasses", "hood", "beret", "headphones", "tie", "cap", "bun", "visor", "scarf"]);
+export const AccessorySchema = z.enum([
+  "hardhat",
+  "glasses",
+  "hood",
+  "beret",
+  "headphones",
+  "tie",
+  "cap",
+  "bun",
+  "visor",
+  "scarf",
+]);
 
 // Jenis properti khas di ruangan divisi pada kantor 3D.
 export const RoomSignatureSchema = z.enum([
@@ -56,7 +74,7 @@ export const RoomSignatureSchema = z.enum([
   "mic",
   "typewriter",
   "phone",
-  "poster"
+  "poster",
 ]);
 
 const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -72,7 +90,7 @@ export const PersonaSchema = z.object({
   accent: HexColor.optional(),
   accessory: AccessorySchema.optional(),
   signature: RoomSignatureSchema.optional(),
-  smallTalk: z.array(z.string()).default([])
+  smallTalk: z.array(z.string()).default([]),
 });
 
 export const DivisionConfigSchema = z.object({
@@ -94,14 +112,16 @@ export const DivisionConfigSchema = z.object({
   permission: z.object({
     read: z.enum(["allow", "deny"]).default("allow"),
     edit: z.enum(["workspace", "deny"]).default("workspace"),
-    bash: z.object({
-      allow: z.array(z.string()).default([]),
-      ask: z.array(z.string()).default([]),
-      deny: z.array(z.string()).default([])
-    }).default({ allow: [], ask: [], deny: [] }),
-    webfetch: z.enum(["allow", "deny"]).default("allow")
+    bash: z
+      .object({
+        allow: z.array(z.string()).default([]),
+        ask: z.array(z.string()).default([]),
+        deny: z.array(z.string()).default([]),
+      })
+      .default({ allow: [], ask: [], deny: [] }),
+    webfetch: z.enum(["allow", "deny"]).default("allow"),
   }),
-  prompt: z.string()
+  prompt: z.string(),
 });
 
 export const PlanTaskItemSchema = z.object({
@@ -109,28 +129,28 @@ export const PlanTaskItemSchema = z.object({
   divisionId: z.string(),
   description: z.string(),
   doneCriteria: z.string(),
-  dependsOnTitles: z.array(z.string()).default([])
+  dependsOnTitles: z.array(z.string()).default([]),
 });
 
 export const ProjectPlanSchema = z.object({
   title: z.string(),
   goal: z.string(),
-  tasks: z.array(PlanTaskItemSchema)
+  tasks: z.array(PlanTaskItemSchema),
 });
 
 export const FloorSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string(),
-  description: z.string().default("")
+  description: z.string().default(""),
 });
 
 export const CreateProjectInputSchema = z.object({
   title: z.string().min(1),
   goal: z.string().min(1),
-  tokenBudget: z.number().int().positive().optional()
+  tokenBudget: z.number().int().positive().optional(),
 });
 
 export const ApprovalDecisionInputSchema = z.object({
   decision: z.enum(["approved", "rejected"]),
-  decidedBy: z.string()
+  decidedBy: z.string(),
 });

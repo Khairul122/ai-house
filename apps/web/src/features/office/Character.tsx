@@ -1,39 +1,58 @@
 import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
-import { type Camera, type Group, type OrthographicCamera, Vector3 } from "three";
-import type { AgentStatus, Dispatch } from "../../state/reduce.ts";
-import { play, type SoundName } from "../../lib/sound.ts";
-import { env } from "../../state/env.ts";
+import {
+  type Camera,
+  type Group,
+  type OrthographicCamera,
+  Vector3,
+} from "three";
+import { type SoundName, play } from "../../lib/sound.ts";
 import { camera as view } from "../../state/camera.ts";
-import { coordinatorId, getFloors, meetingOn, office, useDivisions } from "../../state/store.ts";
+import { env } from "../../state/env.ts";
 import { setFocus, useFocus } from "../../state/focus.ts";
+import type { AgentStatus, Dispatch } from "../../state/reduce.ts";
+import {
+  coordinatorId,
+  getFloors,
+  meetingOn,
+  office,
+  useDivisions,
+} from "../../state/store.ts";
 import { useAgentStatus } from "../../state/useAgentStatus.ts";
+import { atmo } from "./Atmosphere.tsx";
 import { CharacterPeek } from "./CharacterPeek.tsx";
+import { type Religion, worshipUntil } from "./environment.ts";
 import {
   type Act,
-  deskOf,
   FLOOR_H,
+  GENERAL_TALK,
+  LEISURE,
+  POOL,
+  type Vec2,
+  WORSHIP_SPOTS,
+  type Waypoint,
+  type WorshipStyle,
+  deskOf,
   insideOf,
   levelOf,
   meetingIdOf,
   meetingSeats,
-  LEISURE,
-  POOL,
   randomInRoom,
   roomById,
   seatOf,
-  GENERAL_TALK,
   standOf,
   toCorridor,
-  type Vec2,
-  type Waypoint,
-  WORSHIP_SPOTS,
-  type WorshipStyle
 } from "./layout.ts";
-import { atmo } from "./Atmosphere.tsx";
-import { type Religion, worshipUntil } from "./environment.ts";
-import { type Doing, type Emotion, emotionOf, lowestNeed, type Need, simOf, stepNeeds } from "./sims.ts";
+import {
+  type Doing,
+  type Emotion,
+  type Need,
+  emotionOf,
+  lowestNeed,
+  simOf,
+  stepNeeds,
+} from "./sims.ts";
 
 // 1 detik nyata = 0,25 menit simulasi: kebutuhan berubah terlihat dalam hitungan menit.
 const SIM_MINUTES_PER_SECOND = 0.25;
@@ -43,10 +62,16 @@ const RESTORES: Record<Need, Act[]> = {
   energi: ["sleep", "coffee"],
   sosial: ["coffee"],
   hiburan: ["swim", "read", "relax", "stretch"],
-  spiritual: ["read", "relax"]
+  spiritual: ["read", "relax"],
 };
 
-const EMOTION_ICONS: Emotion[] = ["senang", "sedih", "kesepian", "lelah", "bosan"];
+const EMOTION_ICONS: Emotion[] = [
+  "senang",
+  "sedih",
+  "kesepian",
+  "lelah",
+  "bosan",
+];
 
 const ACT_TEXT: Record<string, string> = {
   sleep: "Tidur",
@@ -54,7 +79,7 @@ const ACT_TEXT: Record<string, string> = {
   swim: "Berenang di kolam",
   read: "Membaca di Taman Baca",
   relax: "Bersantai",
-  stretch: "Peregangan di taman"
+  stretch: "Peregangan di taman",
 };
 
 const WORSHIP_TEXT: Record<string, string> = {
@@ -63,12 +88,22 @@ const WORSHIP_TEXT: Record<string, string> = {
   "doa-katolik": "Berdoa di gereja",
   sembah: "Sembahyang di pura",
   meditasi: "Meditasi di vihara",
-  dupa: "Bersembahyang di klenteng"
+  dupa: "Bersembahyang di klenteng",
 };
-import { type Accessory, lookOf, MAT, useLook } from "./looks.ts";
+import { type Accessory, MAT, lookOf, useLook } from "./looks.ts";
 import { Box } from "./parts.tsx";
-import { claim, leaveMeet, markArrived, meetOf, placeIn, proposeChat, releaseAll, setAvailable, turnOf } from "./social.ts";
-import { buildPath, type Zone, zoneAt } from "./walk.ts";
+import {
+  claim,
+  leaveMeet,
+  markArrived,
+  meetOf,
+  placeIn,
+  proposeChat,
+  releaseAll,
+  setAvailable,
+  turnOf,
+} from "./social.ts";
+import { type Zone, buildPath, zoneAt } from "./walk.ts";
 
 const SPEED = 1.8;
 const PANTS = "#3A3A40";
@@ -91,7 +126,10 @@ const v3 = new Vector3();
 function audibility(camera: Camera, x: number, z: number) {
   v3.set(x, 1, z).project(camera);
   if (Math.abs(v3.x) > 1.05 || Math.abs(v3.y) > 1.05) return 0;
-  return Math.min(1, Math.max(0, ((camera as OrthographicCamera).zoom - 12) / 35));
+  return Math.min(
+    1,
+    Math.max(0, ((camera as OrthographicCamera).zoom - 12) / 35),
+  );
 }
 
 // Satu bunyi pembuka per tempat ibadah per sesi, bukan satu per jamaah.
@@ -102,11 +140,13 @@ const BUILDING_SOUND: Record<string, SoundName | null> = {
   "gereja-katolik": "bell",
   pura: "chime",
   vihara: "gong",
-  klenteng: "gong"
+  klenteng: "gong",
 };
 
-const angleTo = (from: Vec2, to: Vec2) => Math.atan2(to[0] - from[0], to[1] - from[1]);
-const inPool = (x: number, z: number) => Math.abs(x - POOL.x) < POOL.w / 2 && Math.abs(z - POOL.z) < POOL.d / 2;
+const angleTo = (from: Vec2, to: Vec2) =>
+  Math.atan2(to[0] - from[0], to[1] - from[1]);
+const inPool = (x: number, z: number) =>
+  Math.abs(x - POOL.x) < POOL.w / 2 && Math.abs(z - POOL.z) < POOL.d / 2;
 const shuffle = <T,>(list: T[]) => [...list].sort(() => Math.random() - 0.5);
 
 function lineFor(id: string, turn: number) {
@@ -117,7 +157,12 @@ function lineFor(id: string, turn: number) {
   return pool[(turn * 7 + h) % pool.length];
 }
 
-function HeadGear({ kind, accent, hair, shirt }: { kind: Accessory; accent: string; hair: string; shirt: string }) {
+function HeadGear({
+  kind,
+  accent,
+  hair,
+  shirt,
+}: { kind: Accessory; accent: string; hair: string; shirt: string }) {
   switch (kind) {
     case "hardhat":
       return (
@@ -127,11 +172,25 @@ function HeadGear({ kind, accent, hair, shirt }: { kind: Accessory; accent: stri
         </>
       );
     case "glasses":
-      return <Box p={[0, 0.21, 0.2]} s={[0.33, 0.08, 0.02]} c="#1B1A17" shadow={false} />;
+      return (
+        <Box
+          p={[0, 0.21, 0.2]}
+          s={[0.33, 0.08, 0.02]}
+          c="#1B1A17"
+          shadow={false}
+        />
+      );
     case "hood":
       return <Box p={[0, 0.2, -0.05]} s={[0.45, 0.45, 0.4]} c={shirt} />;
     case "beret":
-      return <Box p={[0.04, 0.42, 0]} s={[0.42, 0.08, 0.42]} c={accent} rotation={[0, 0, 0.18]} />;
+      return (
+        <Box
+          p={[0.04, 0.42, 0]}
+          s={[0.42, 0.08, 0.42]}
+          c={accent}
+          rotation={[0, 0, 0.18]}
+        />
+      );
     case "headphones":
       return (
         <>
@@ -194,7 +253,9 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
   const umbrella = useRef<Group>(null);
   const emotionIcons = useRef<Group>(null);
   const incense = useRef<Group>(null);
-  const religion = useDivisions().find((d) => d.id === id)?.religion as Religion | undefined;
+  const religion = useDivisions().find((d) => d.id === id)?.religion as
+    | Religion
+    | undefined;
 
   const seat = seatOf(room);
   const faceDesk = angleTo(seat, deskOf(room));
@@ -206,7 +267,13 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       y: room.level * FLOOR_H,
       facing: faceDesk,
       path: [] as Waypoint[],
-      goal: { key: "start", zone: id, at: seat, pose: "sit", face: faceDesk } as Goal,
+      goal: {
+        key: "start",
+        zone: id,
+        at: seat,
+        pose: "sit",
+        face: faceDesk,
+      } as Goal,
       idle: null as Goal | null,
       nextIdle: Date.now() + Math.random() * 6000,
       count: 0,
@@ -220,13 +287,18 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       lastTurn: -1,
       sipping: false,
       carrying: null as Dispatch | null,
-      handoverAt: 0
+      handoverAt: 0,
     }),
-    // biome-ignore lint/correctness/useExhaustiveDependencies: dibuat sekali per karakter
-    []
+    [],
   );
 
-  const sitGoal = (key: string): Goal => ({ key, zone: id, at: seat, pose: "sit", face: faceDesk });
+  const sitGoal = (key: string): Goal => ({
+    key,
+    zone: id,
+    at: seat,
+    pose: "sit",
+    face: faceDesk,
+  });
 
   // Memilih kegiatan santai berikutnya: kursi kerja, jalan-jalan, ngobrol, atau tempat santai.
   const pickIdle = (now: number): Goal => {
@@ -235,17 +307,26 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     if (reducedMotion) return sitGoal(n);
     const r = Math.random();
     if (r < 0.16) return sitGoal(n);
-    if (r < 0.26) return { key: n, zone: id, at: randomInRoom(room), pose: "stand" };
+    if (r < 0.26)
+      return { key: n, zone: id, at: randomInRoom(room), pose: "stand" };
     const sim = simOf(id);
     const need = lowestNeed(sim.needs);
     const urgent = sim.needs[need] < 55;
-    if (((urgent && need === "sosial") || (!urgent && r < 0.42)) && proposeChat(id, [brain.x, brain.z], now)) return brain.goal; // obrolan diambil alih oleh meetOf
+    if (
+      ((urgent && need === "sosial") || (!urgent && r < 0.42)) &&
+      proposeChat(id, [brain.x, brain.z], now)
+    )
+      return brain.goal; // obrolan diambil alih oleh meetOf
     // hujan: tetap di dalam gedung; dingin: tidak berenang; panas: kolam ramai; malam: lebih banyak tidur
     const w = atmo.weather;
     const night = atmo.phase === "malam";
     const options = LEISURE.filter((l) => {
       if (w === "hujan" && zoneAt(l.at[0], l.at[1]) === "outside") return false;
-      if (w === "dingin" && (l.act === "swim" || l.key.startsWith("kursi-kolam"))) return false;
+      if (
+        w === "dingin" &&
+        (l.act === "swim" || l.key.startsWith("kursi-kolam"))
+      )
+        return false;
       if (night && l.act === "swim") return false;
       return true;
     }).flatMap((l) => {
@@ -256,10 +337,19 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       return Array<typeof l>(weight).fill(l);
     });
     // kebutuhan mendesak: utamakan tempat yang memulihkannya
-    const wanted = urgent ? options.filter((l) => RESTORES[need].includes(l.act)) : [];
+    const wanted = urgent
+      ? options.filter((l) => RESTORES[need].includes(l.act))
+      : [];
     for (const spot of [...shuffle(wanted), ...shuffle(options)]) {
       if (!claim(spot.key, id)) continue;
-      return { key: `${n}-${spot.key}`, zone: zoneAt(spot.at[0], spot.at[1]), at: spot.at, pose: spot.pose, face: spot.face, act: spot.act };
+      return {
+        key: `${n}-${spot.key}`,
+        zone: zoneAt(spot.at[0], spot.at[1]),
+        at: spot.at,
+        pose: spot.pose,
+        face: spot.face,
+        act: spot.act,
+      };
     }
     return { key: n, zone: id, at: randomInRoom(room), pose: "stand" };
   };
@@ -283,12 +373,22 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       brain.lastStatus = status;
     }
     const busyLeisure = brain.goal.act === "sleep" || brain.goal.act === "swim";
-    setAvailable(id, status === "idle" && !reducedMotion && !brain.carrying && !busyLeisure && brain.path.length === 0);
+    setAvailable(
+      id,
+      status === "idle" &&
+        !reducedMotion &&
+        !brain.carrying &&
+        !busyLeisure &&
+        brain.path.length === 0,
+    );
 
     // 1. Pilih tujuan dari status asli backend.
     let goal: Goal;
     // koordinator/ketua bidang mengantar map tugas yang ia bagikan ke divisi tujuan
-    const mine = status !== "waiting" && !brain.carrying ? s.dispatches.find((d) => (d.from ?? coordinatorId()) === id) : undefined;
+    const mine =
+      status !== "waiting" && !brain.carrying
+        ? s.dispatches.find((d) => (d.from ?? coordinatorId()) === id)
+        : undefined;
     if (mine) {
       brain.carrying = mine;
       brain.handoverAt = 0;
@@ -296,43 +396,97 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       releaseAll(id);
     }
     // rapat bidang: seluruh lantai berkumpul di ruang rapat, kecuali yang menunggu izin atau gagal
-    const meetingRoom = meetingOn(room.floor) && !brain.carrying && status !== "waiting" && status !== "failed" ? roomById(meetingIdOf(room.floor)) : undefined;
+    const meetingRoom =
+      meetingOn(room.floor) &&
+      !brain.carrying &&
+      status !== "waiting" &&
+      status !== "failed"
+        ? roomById(meetingIdOf(room.floor))
+        : undefined;
     // jadwal ibadah memakai jam simulasi/nyata; dicek sekali per detik
     if (now > brain.worshipCheckAt) {
       brain.worshipCheckAt = now + 1000;
       brain.worshipEnd = worshipUntil(religion, env.now());
     }
-    const worshipping = status === "idle" && !brain.carrying && !meetingRoom && brain.worshipEnd !== null && !!religion;
+    const worshipping =
+      status === "idle" &&
+      !brain.carrying &&
+      !meetingRoom &&
+      brain.worshipEnd !== null &&
+      !!religion;
     if (worshipping || meetingRoom) leaveMeet(id);
-    const meet = status === "idle" && !brain.carrying && !worshipping && !meetingRoom ? meetOf(id, now) : undefined;
+    const meet =
+      status === "idle" && !brain.carrying && !worshipping && !meetingRoom
+        ? meetOf(id, now)
+        : undefined;
     if (meetingRoom) {
-      const members = getFloors().find((f) => f.id === room.floor)?.divisionIds ?? [];
+      const members =
+        getFloors().find((f) => f.id === room.floor)?.divisionIds ?? [];
       const seats = meetingSeats(meetingRoom);
       const i = Math.max(0, members.indexOf(id)) % seats.length;
-      goal = { key: `rapat-${i}`, zone: meetingRoom.id, at: seats[i].at, pose: "sit", face: seats[i].face };
+      goal = {
+        key: `rapat-${i}`,
+        zone: meetingRoom.id,
+        at: seats[i].at,
+        pose: "sit",
+        face: seats[i].face,
+      };
       if (brain.worshipKey) brain.worshipKey = "";
     } else if (brain.carrying) {
       const target = roomById(brain.carrying.to);
       goal = target
-        ? { key: `deliver-${brain.carrying.taskId}`, zone: target.id, at: insideOf(target), pose: "stand" }
+        ? {
+            key: `deliver-${brain.carrying.taskId}`,
+            zone: target.id,
+            at: insideOf(target),
+            pose: "stand",
+          }
         : sitGoal("deliver-missing");
     } else if (status === "working") goal = sitGoal("work");
     else if (status === "failed") goal = sitGoal("fail");
     else if (status === "waiting") {
-      goal = { key: "wait", zone: id, at: standOf(room), pose: "stand", face: toCorridor(room) > 0 ? 0 : Math.PI };
-    } else if (status === "done") goal = { ...brain.goal, pose: brain.goal.pose === "sit" ? "sit" : "stand", act: undefined };
+      goal = {
+        key: "wait",
+        zone: id,
+        at: standOf(room),
+        pose: "stand",
+        face: toCorridor(room) > 0 ? 0 : Math.PI,
+      };
+    } else if (status === "done")
+      goal = {
+        ...brain.goal,
+        pose: brain.goal.pose === "sit" ? "sit" : "stand",
+        act: undefined,
+      };
     else if (worshipping && religion) {
       const spots = WORSHIP_SPOTS[religion];
       if (!brain.worshipKey) {
         releaseAll(id);
-        brain.worshipKey = (spots.find((w) => claim(w.key, id)) ?? spots[0]).key;
+        brain.worshipKey = (
+          spots.find((w) => claim(w.key, id)) ?? spots[0]
+        ).key;
         brain.rang = "";
       }
       const w = spots.find((x) => x.key === brain.worshipKey) ?? spots[0];
-      goal = { key: `ibadah-${w.key}`, zone: "outside", at: w.at, pose: "stand", face: w.face, act: "worship", style: w.style };
+      goal = {
+        key: `ibadah-${w.key}`,
+        zone: "outside",
+        at: w.at,
+        pose: "stand",
+        face: w.face,
+        act: "worship",
+        style: w.style,
+      };
     } else if (meet) {
       const place = placeIn(meet, id);
-      goal = { key: meet.key, zone: meet.zone, at: place.at, pose: "stand", face: place.face, act: "chat" };
+      goal = {
+        key: meet.key,
+        zone: meet.zone,
+        at: place.at,
+        pose: "stand",
+        face: place.face,
+        act: "chat",
+      };
       brain.chatting = true;
     } else {
       if (brain.worshipKey) {
@@ -352,7 +506,14 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     }
 
     if (goal.key !== brain.goal.key) {
-      brain.path = buildPath(zoneAt(brain.x, brain.z, brain.level), goal.zone, goal.at, [brain.x, brain.z], brain.level, levelOf(goal.zone));
+      brain.path = buildPath(
+        zoneAt(brain.x, brain.z, brain.level),
+        goal.zone,
+        goal.at,
+        [brain.x, brain.z],
+        brain.level,
+        levelOf(goal.zone),
+      );
     }
     brain.goal = goal;
 
@@ -367,7 +528,14 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       const dz = tz - brain.z;
       const dist = Math.hypot(dx, dz);
       const e = simOf(id).emotion;
-      const mood = e === "sedih" || e === "kesepian" ? 0.7 : e === "lelah" ? 0.75 : e === "senang" ? 1.15 : 1;
+      const mood =
+        e === "sedih" || e === "kesepian"
+          ? 0.7
+          : e === "lelah"
+            ? 0.75
+            : e === "senang"
+              ? 1.15
+              : 1;
       const step = SPEED * mood * (inPool(brain.x, brain.z) ? 0.5 : 1) * dt;
       if (dist <= step) {
         brain.x = tx;
@@ -388,7 +556,10 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     if (brain.carrying && !moving && goal.key.startsWith("deliver")) {
       if (!brain.handoverAt) brain.handoverAt = now + 900;
       else if (now > brain.handoverAt) {
-        office.send({ type: "dispatch.delivered", payload: { taskId: brain.carrying.taskId } });
+        office.send({
+          type: "dispatch.delivered",
+          payload: { taskId: brain.carrying.taskId },
+        });
         brain.carrying = null;
       }
     }
@@ -552,7 +723,12 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       arz = -0.9;
     }
     // payung saat hujan di luar gedung, kecuali berbaring, berenang, atau beribadah
-    const umbrellaOn = outside && atmo.rain > 0.4 && pose !== "lie" && pose !== "swim" && act !== "worship";
+    const umbrellaOn =
+      outside &&
+      atmo.rain > 0.4 &&
+      pose !== "lie" &&
+      pose !== "swim" &&
+      act !== "worship";
     if (umbrellaOn) ar = -2.0;
     if (brain.carrying && status !== "waiting") ar = moving ? -0.6 : -1.0;
 
@@ -563,23 +739,23 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
         ? "ibadah"
         : meetingRoom && !moving
           ? "ngobrol"
-        : status === "working" && !moving
-          ? "kerja"
-          : moving
-            ? "jalan"
-            : act === "sleep"
-              ? "tidur"
-              : act === "coffee"
-                ? "kopi"
-                : act === "chat" && meet && turnOf(meet, now)
-                  ? "ngobrol"
-                  : act === "swim"
-                    ? "berenang"
-                    : act === "read"
-                      ? "membaca"
-                      : act === "relax" || act === "stretch"
-                        ? "taman"
-                        : "diam";
+          : status === "working" && !moving
+            ? "kerja"
+            : moving
+              ? "jalan"
+              : act === "sleep"
+                ? "tidur"
+                : act === "coffee"
+                  ? "kopi"
+                  : act === "chat" && meet && turnOf(meet, now)
+                    ? "ngobrol"
+                    : act === "swim"
+                      ? "berenang"
+                      : act === "read"
+                        ? "membaca"
+                        : act === "relax" || act === "stretch"
+                          ? "taman"
+                          : "diam";
     sim.needs = stepNeeds(sim.needs, doing, dt * SIM_MINUTES_PER_SECOND);
     const emotion = emotionOf(sim.needs, status, doing);
     sim.emotion = emotion;
@@ -589,32 +765,37 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
         ? status === "working"
           ? `Rapat bidang: ${agent?.task?.title ?? "berdiskusi"}`
           : "Ikut rapat bidang di ruang rapat"
-      : status === "working"
-        ? `Mengerjakan "${agent?.task?.title ?? "tugas"}"`
-        : status === "waiting"
-          ? "Menunggu izin untuk melanjutkan"
-          : status === "failed"
-            ? "Memikirkan tugas yang gagal"
-            : act === "worship" && goal.style
-              ? WORSHIP_TEXT[goal.style]
-              : act === "chat" && meet
-                ? `Ngobrol dengan ${lookOf(meet.a === id ? meet.b : meet.a).name}`
-                : act === "sleep"
-                  ? pose === "lie" && goal.at[1] < 5
-                    ? "Tidur siang di sofa"
-                    : "Tidur di kursi berjemur"
-                  : act && ACT_TEXT[act]
-                    ? ACT_TEXT[act]
-                    : moving
-                      ? "Berjalan"
-                      : "Santai di ruangannya";
+        : status === "working"
+          ? `Mengerjakan "${agent?.task?.title ?? "tugas"}"`
+          : status === "waiting"
+            ? "Menunggu izin untuk melanjutkan"
+            : status === "failed"
+              ? "Memikirkan tugas yang gagal"
+              : act === "worship" && goal.style
+                ? WORSHIP_TEXT[goal.style]
+                : act === "chat" && meet
+                  ? `Ngobrol dengan ${lookOf(meet.a === id ? meet.b : meet.a).name}`
+                  : act === "sleep"
+                    ? pose === "lie" && goal.at[1] < 5
+                      ? "Tidur siang di sofa"
+                      : "Tidur di kursi berjemur"
+                    : act && ACT_TEXT[act]
+                      ? ACT_TEXT[act]
+                      : moving
+                        ? "Berjalan"
+                        : "Santai di ruangannya";
 
     // bahasa tubuh sesuai emosi (hanya saat tidak sedang melakukan sesuatu yang khusus)
     const free = !act && !moving && pose === "stand" && status === "idle";
     if (emotion === "sedih" || emotion === "kesepian") hx = Math.max(hx, 0.4);
     if (emotion === "lelah") bx = Math.max(bx, 0.15);
-    if (free && emotion === "senang" && Math.sin(t * 2.1 + id.length) > 0.92) y = 0.18; // lompat kecil
-    if (free && (emotion === "bosan" || emotion === "lelah") && Math.sin(t * 0.9 + id.length) > 0.93) {
+    if (free && emotion === "senang" && Math.sin(t * 2.1 + id.length) > 0.92)
+      y = 0.18; // lompat kecil
+    if (
+      free &&
+      (emotion === "bosan" || emotion === "lelah") &&
+      Math.sin(t * 0.9 + id.length) > 0.93
+    ) {
       al = ar = -2.8; // menguap sambil meregang
       hx = -0.4;
     }
@@ -640,7 +821,8 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       ease(armL.current, "z", alz);
       ease(armR.current, "z", arz);
     }
-    if (tilt.current) tilt.current.position.y += (lift - tilt.current.position.y) * k;
+    if (tilt.current)
+      tilt.current.position.y += (lift - tilt.current.position.y) * k;
 
     g.position.set(brain.x, brain.y + y, brain.z);
     const viewFloor = view.get().floor;
@@ -659,7 +841,11 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
     if (umbrella.current) umbrella.current.visible = umbrellaOn;
     const icons = emotionIcons.current;
     if (icons) {
-      const showIcon = status !== "waiting" && !(act === "chat") && !(act === "sleep" && pose === "lie") && pose !== "swim";
+      const showIcon =
+        status !== "waiting" &&
+        !(act === "chat") &&
+        !(act === "sleep" && pose === "lie") &&
+        pose !== "swim";
       icons.visible = showIcon;
       icons.position.y = (pose === "lie" ? 1.0 : 2.05) + Math.sin(t * 2) * 0.04;
       icons.position.z = pose === "lie" ? -1.15 : 0;
@@ -668,14 +854,17 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       });
       icons.rotation.y = -g.rotation.y + Math.PI / 4; // selalu menghadap kamera bawaan
     }
-    if (incense.current) incense.current.visible = act === "worship" && goal.style === "dupa";
+    if (incense.current)
+      incense.current.visible = act === "worship" && goal.style === "dupa";
 
     // suara interaksi, hanya bila karakter terlihat dan kamera cukup dekat
     const vol = hide ? 0 : audibility(camera, brain.x, brain.z);
     if (vol > 0) {
       if (act === "worship" && brain.rang !== goal.key) {
         brain.rang = goal.key;
-        const w = religion ? WORSHIP_SPOTS[religion].find((x) => x.key === brain.worshipKey) : undefined;
+        const w = religion
+          ? WORSHIP_SPOTS[religion].find((x) => x.key === brain.worshipKey)
+          : undefined;
         const sound = w ? BUILDING_SOUND[w.building] : null;
         if (w && sound && now - (buildingRang.get(w.building) ?? 0) > 60_000) {
           buildingRang.set(w.building, now);
@@ -699,12 +888,23 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
         else if (pose === "swim") play("splash", vol);
         else if (act === "sleep" && pose === "lie") play("snore", vol);
         else if (act === "read" && !moving) play("page", vol * 0.8);
-        brain.nextSound = now + (status === "working" ? 1400 : pose === "swim" ? 2400 : act === "sleep" ? 4500 : 7000) + Math.random() * 900;
+        brain.nextSound =
+          now +
+          (status === "working"
+            ? 1400
+            : pose === "swim"
+              ? 2400
+              : act === "sleep"
+                ? 4500
+                : 7000) +
+          Math.random() * 900;
       }
     }
     if (bang.current && agent) {
       const fresh = now - agent.changedAt < 3000; // memantul sebentar saat baru muncul, lalu diam
-      bang.current.position.y = 1.78 + (fresh && !reducedMotion ? Math.abs(Math.sin(now / 140)) * 0.12 : 0);
+      bang.current.position.y =
+        1.78 +
+        (fresh && !reducedMotion ? Math.abs(Math.sin(now / 140)) * 0.12 : 0);
     }
 
     // Gelembung obrolan / tidur. Elemen HTML hanya dipasang saat ada teks (HTML di kanvas
@@ -724,13 +924,15 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       el.className = text === "Zzz" ? "speech speech-sleep" : "speech";
     }
     // berbaring: kepala ada di belakang kaki, jadi gelembung ikut pindah
-    talkAnchor.current?.position.set(0, pose === "lie" ? 0.95 : 1.75, pose === "lie" ? -1.15 : 0);
+    talkAnchor.current?.position.set(
+      0,
+      pose === "lie" ? 0.95 : 1.75,
+      pose === "lie" ? -1.15 : 0,
+    );
   });
 
   return (
-    <group
-      ref={root}
-    >
+    <group ref={root}>
       <group ref={tilt}>
         <mesh
           visible={false}
@@ -758,8 +960,17 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
 
         <group ref={body} position={[0, 0.45, 0]}>
           <Box p={[0, 0.25, 0]} s={[0.46, 0.5, 0.28]} c={look.shirt} />
-          {look.accessory === "tie" && <Box p={[0, 0.3, 0.145]} s={[0.08, 0.32, 0.02]} c={look.accent} shadow={false} />}
-          {look.accessory === "scarf" && <Box p={[0, 0.48, 0]} s={[0.5, 0.1, 0.32]} c={look.accent} />}
+          {look.accessory === "tie" && (
+            <Box
+              p={[0, 0.3, 0.145]}
+              s={[0.08, 0.32, 0.02]}
+              c={look.accent}
+              shadow={false}
+            />
+          )}
+          {look.accessory === "scarf" && (
+            <Box p={[0, 0.48, 0]} s={[0.5, 0.1, 0.32]} c={look.accent} />
+          )}
 
           {[armL, armR].map((ref, i) => (
             <group key={i} ref={ref} position={[i ? 0.3 : -0.3, 0.47, 0]}>
@@ -768,21 +979,44 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
               {i === 1 && (
                 <>
                   <group ref={folder} visible={false}>
-                    <Box p={[0, -0.5, 0.12]} s={[0.05, 0.3, 0.26]} c="#E2C27A" />
+                    <Box
+                      p={[0, -0.5, 0.12]}
+                      s={[0.05, 0.3, 0.26]}
+                      c="#E2C27A"
+                    />
                   </group>
                   <group ref={cup} visible={false}>
                     <Box p={[0, -0.5, 0.08]} s={[0.1, 0.13, 0.1]} c="#F4EEDF" />
                   </group>
                   <group ref={incense} visible={false}>
                     {[-0.04, 0, 0.04].map((x) => (
-                      <Box key={x} p={[x, -0.5, 0.25]} s={[0.015, 0.015, 0.4]} c="#C8553D" shadow={false} />
+                      <Box
+                        key={x}
+                        p={[x, -0.5, 0.25]}
+                        s={[0.015, 0.015, 0.4]}
+                        c="#C8553D"
+                        shadow={false}
+                      />
                     ))}
                     {[-0.04, 0, 0.04].map((x) => (
-                      <Box key={`ujung${x}`} p={[x, -0.5, 0.46]} s={[0.025, 0.025, 0.03]} c="#FF8A4A" emissive="#FF6A2A" glow={1} shadow={false} />
+                      <Box
+                        key={`ujung${x}`}
+                        p={[x, -0.5, 0.46]}
+                        s={[0.025, 0.025, 0.03]}
+                        c="#FF8A4A"
+                        emissive="#FF6A2A"
+                        glow={1}
+                        shadow={false}
+                      />
                     ))}
                   </group>
                   <group ref={book} visible={false}>
-                    <Box p={[-0.3, -0.5, 0.06]} s={[0.42, 0.06, 0.3]} c={look.accent} rotation={[0.5, 0, 0]} />
+                    <Box
+                      p={[-0.3, -0.5, 0.06]}
+                      s={[0.42, 0.06, 0.3]}
+                      c={look.accent}
+                      rotation={[0.5, 0, 0]}
+                    />
                   </group>
                 </>
               )}
@@ -791,15 +1025,30 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
 
           <group ref={head} position={[0, 0.5, 0]}>
             <Box p={[0, 0.19, 0]} s={[0.38, 0.38, 0.38]} c={look.skin} />
-            <Box p={[-0.08, 0.21, 0.195]} s={[0.05, 0.06, 0.02]} c="#1B1A17" shadow={false} />
-            <Box p={[0.08, 0.21, 0.195]} s={[0.05, 0.06, 0.02]} c="#1B1A17" shadow={false} />
+            <Box
+              p={[-0.08, 0.21, 0.195]}
+              s={[0.05, 0.06, 0.02]}
+              c="#1B1A17"
+              shadow={false}
+            />
+            <Box
+              p={[0.08, 0.21, 0.195]}
+              s={[0.05, 0.06, 0.02]}
+              c="#1B1A17"
+              shadow={false}
+            />
             {look.accessory !== "hood" && (
               <>
                 <Box p={[0, 0.37, -0.01]} s={[0.4, 0.08, 0.41]} c={look.hair} />
                 <Box p={[0, 0.22, -0.18]} s={[0.4, 0.3, 0.06]} c={look.hair} />
               </>
             )}
-            <HeadGear kind={look.accessory} accent={look.accent} hair={look.hair} shirt={look.shirt} />
+            <HeadGear
+              kind={look.accessory}
+              accent={look.accent}
+              hair={look.hair}
+              shirt={look.shirt}
+            />
           </group>
         </group>
       </group>
@@ -808,35 +1057,103 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       <group ref={emotionIcons} position={[0, 2.05, 0]}>
         <group>
           {/* senang: hati */}
-          <Box p={[-0.07, 0.05, 0]} s={[0.13, 0.13, 0.06]} c="#E5677A" emissive="#E5677A" glow={0.4} shadow={false} />
-          <Box p={[0.07, 0.05, 0]} s={[0.13, 0.13, 0.06]} c="#E5677A" emissive="#E5677A" glow={0.4} shadow={false} />
-          <Box p={[0, -0.04, 0]} s={[0.14, 0.14, 0.06]} c="#E5677A" emissive="#E5677A" glow={0.4} shadow={false} rotation={[0, 0, Math.PI / 4]} />
+          <Box
+            p={[-0.07, 0.05, 0]}
+            s={[0.13, 0.13, 0.06]}
+            c="#E5677A"
+            emissive="#E5677A"
+            glow={0.4}
+            shadow={false}
+          />
+          <Box
+            p={[0.07, 0.05, 0]}
+            s={[0.13, 0.13, 0.06]}
+            c="#E5677A"
+            emissive="#E5677A"
+            glow={0.4}
+            shadow={false}
+          />
+          <Box
+            p={[0, -0.04, 0]}
+            s={[0.14, 0.14, 0.06]}
+            c="#E5677A"
+            emissive="#E5677A"
+            glow={0.4}
+            shadow={false}
+            rotation={[0, 0, Math.PI / 4]}
+          />
         </group>
         <group>
           {/* sedih: tetes air mata */}
-          <Box p={[0, -0.03, 0]} s={[0.14, 0.14, 0.06]} c="#5B8DD6" emissive="#5B8DD6" glow={0.4} shadow={false} rotation={[0, 0, Math.PI / 4]} />
-          <Box p={[0, 0.09, 0]} s={[0.06, 0.08, 0.06]} c="#5B8DD6" emissive="#5B8DD6" glow={0.4} shadow={false} />
+          <Box
+            p={[0, -0.03, 0]}
+            s={[0.14, 0.14, 0.06]}
+            c="#5B8DD6"
+            emissive="#5B8DD6"
+            glow={0.4}
+            shadow={false}
+            rotation={[0, 0, Math.PI / 4]}
+          />
+          <Box
+            p={[0, 0.09, 0]}
+            s={[0.06, 0.08, 0.06]}
+            c="#5B8DD6"
+            emissive="#5B8DD6"
+            glow={0.4}
+            shadow={false}
+          />
         </group>
         <group>
           {/* kesepian: tetes kecil pucat */}
-          <Box p={[0, 0, 0]} s={[0.1, 0.1, 0.06]} c="#9BB3D6" emissive="#9BB3D6" glow={0.3} shadow={false} rotation={[0, 0, Math.PI / 4]} />
+          <Box
+            p={[0, 0, 0]}
+            s={[0.1, 0.1, 0.06]}
+            c="#9BB3D6"
+            emissive="#9BB3D6"
+            glow={0.3}
+            shadow={false}
+            rotation={[0, 0, Math.PI / 4]}
+          />
         </group>
         <group>
           {/* lelah: baterai hampir habis */}
           <Box p={[0, 0, 0]} s={[0.3, 0.14, 0.05]} c="#3A3A3A" shadow={false} />
-          <Box p={[0.17, 0, 0]} s={[0.04, 0.07, 0.05]} c="#3A3A3A" shadow={false} />
-          <Box p={[-0.1, 0, 0.01]} s={[0.06, 0.09, 0.05]} c="#D9534F" emissive="#D9534F" glow={0.5} shadow={false} />
+          <Box
+            p={[0.17, 0, 0]}
+            s={[0.04, 0.07, 0.05]}
+            c="#3A3A3A"
+            shadow={false}
+          />
+          <Box
+            p={[-0.1, 0, 0.01]}
+            s={[0.06, 0.09, 0.05]}
+            c="#D9534F"
+            emissive="#D9534F"
+            glow={0.5}
+            shadow={false}
+          />
         </group>
         <group>
           {/* bosan: tiga titik */}
           {[-0.11, 0, 0.11].map((x) => (
-            <Box key={x} p={[x, 0, 0]} s={[0.07, 0.07, 0.05]} c="#8A8A85" shadow={false} />
+            <Box
+              key={x}
+              p={[x, 0, 0]}
+              s={[0.07, 0.07, 0.05]}
+              c="#8A8A85"
+              shadow={false}
+            />
           ))}
         </group>
       </group>
 
       <group ref={umbrella} visible={false} position={[0.3, 0, 0]}>
-        <Box p={[0, 1.55, 0]} s={[0.04, 1.1, 0.04]} c="#3A3530" shadow={false} />
+        <Box
+          p={[0, 1.55, 0]}
+          s={[0.04, 1.1, 0.04]}
+          c="#3A3530"
+          shadow={false}
+        />
         <mesh position={[0, 2.12, 0]} castShadow>
           <coneGeometry args={[0.75, 0.32, 8]} />
           <meshStandardMaterial color={look.accent} roughness={0.7} />
@@ -845,8 +1162,22 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
 
       {status === "waiting" && (
         <group ref={bang} position={[0, 1.78, 0]}>
-          <Box p={[0, 0.2, 0]} s={[0.1, 0.28, 0.1]} c={MAT.waiting} emissive={MAT.waiting} glow={0.6} shadow={false} />
-          <Box p={[0, 0, 0]} s={[0.1, 0.09, 0.1]} c={MAT.waiting} emissive={MAT.waiting} glow={0.6} shadow={false} />
+          <Box
+            p={[0, 0.2, 0]}
+            s={[0.1, 0.28, 0.1]}
+            c={MAT.waiting}
+            emissive={MAT.waiting}
+            glow={0.6}
+            shadow={false}
+          />
+          <Box
+            p={[0, 0, 0]}
+            s={[0.1, 0.09, 0.1]}
+            c={MAT.waiting}
+            emissive={MAT.waiting}
+            glow={0.6}
+            shadow={false}
+          />
         </group>
       )}
 
@@ -863,7 +1194,12 @@ export function Character({ id, reducedMotion, onSelect }: Props) {
       )}
 
       {!focused && !hidden && status === "working" && agent?.task && (
-        <Html position={[0, 1.85, 0]} center zIndexRange={[10, 0]} pointerEvents="none">
+        <Html
+          position={[0, 1.85, 0]}
+          center
+          zIndexRange={[10, 0]}
+          pointerEvents="none"
+        >
           <div className="speech">{agent.task.title}</div>
         </Html>
       )}

@@ -1,5 +1,10 @@
 import { ShieldCheck } from "lucide-react";
-import { Empty, ErrorNote, Loading, PanelShell } from "../components/PanelShell.tsx";
+import {
+  Empty,
+  ErrorNote,
+  Loading,
+  PanelShell,
+} from "../components/PanelShell.tsx";
 import { useFetch } from "../lib/hooks.ts";
 import { useDivisionName, useOffice } from "../state/store.ts";
 import { ApprovalCard } from "./ApprovalCard.tsx";
@@ -18,12 +23,16 @@ export function ApprovalsPanel() {
   const nameOf = useDivisionName();
 
   return (
-    <PanelShell title="Persetujuan" subtitle="Aksi berisiko berhenti di sini sampai Anda memutuskan.">
+    <PanelShell
+      title="Persetujuan"
+      subtitle="Aksi berisiko berhenti di sini sampai Anda memutuskan."
+    >
       {error && <ErrorNote>{error}</ErrorNote>}
       {!data && !error && <Loading label="Memuat persetujuan" />}
       {data?.length === 0 && (
         <Empty icon={ShieldCheck} title="Tidak ada yang menunggu">
-          Saat divisi butuh izin, karakternya mengangkat tangan dan notifikasi muncul di atas layar.
+          Saat divisi butuh izin, karakternya mengangkat tangan dan notifikasi
+          muncul di atas layar.
         </Empty>
       )}
       <div className="space-y-3">
@@ -38,7 +47,7 @@ export function ApprovalsPanel() {
               riskLevel: r.riskLevel,
               divisionId: r.divisionId,
               divisionName: r.divisionId ? nameOf(r.divisionId) : undefined,
-              taskTitle: r.taskTitle
+              taskTitle: r.taskTitle,
             }}
           />
         ))}

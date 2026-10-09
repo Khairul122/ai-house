@@ -12,7 +12,11 @@ export interface PendingApproval {
   taskTitle?: string | null;
 }
 
-export function ApprovalCard({ a, showOfficeLink, onDecided }: { a: PendingApproval; showOfficeLink?: boolean; onDecided?: () => void }) {
+export function ApprovalCard({
+  a,
+  showOfficeLink,
+  onDecided,
+}: { a: PendingApproval; showOfficeLink?: boolean; onDecided?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,22 +32,38 @@ export function ApprovalCard({ a, showOfficeLink, onDecided }: { a: PendingAppro
   return (
     <article className="approval">
       <p className="text-sm text-ink">
-        {a.divisionName ? <strong>{a.divisionName}</strong> : "Sebuah divisi"} meminta izin menjalankan:
+        {a.divisionName ? <strong>{a.divisionName}</strong> : "Sebuah divisi"}{" "}
+        meminta izin menjalankan:
       </p>
-      <code className="block font-mono text-sm bg-background border border-line rounded px-2 py-1.5 my-2 break-words">{a.summary}</code>
+      <code className="block font-mono text-sm bg-background border border-line rounded px-2 py-1.5 my-2 break-words">
+        {a.summary}
+      </code>
       <p className="text-xs text-ink-muted">
         Risiko level {a.riskLevel}
         {a.taskTitle ? ` · untuk tugas "${a.taskTitle}"` : ""}
       </p>
       <div className="flex items-center gap-2 mt-3 flex-wrap">
-        <button type="button" className="btn btn-ok" disabled={busy} onClick={() => decide("approved")}>
+        <button
+          type="button"
+          className="btn btn-ok"
+          disabled={busy}
+          onClick={() => decide("approved")}
+        >
           Setujui
         </button>
-        <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => decide("rejected")}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          disabled={busy}
+          onClick={() => decide("rejected")}
+        >
           Tolak
         </button>
         {showOfficeLink && a.divisionId && (
-          <Link to={`/divisions/${a.divisionId}`} className="text-sm text-accent underline underline-offset-2 ml-auto">
+          <Link
+            to={`/divisions/${a.divisionId}`}
+            className="text-sm text-accent underline underline-offset-2 ml-auto"
+          >
             Lihat di kantor
           </Link>
         )}

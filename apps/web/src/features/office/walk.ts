@@ -1,16 +1,16 @@
 import {
-  allRooms,
   CORRIDOR_HALF,
   EXITS,
   FLOOR_HALF_X,
   FLOOR_HALF_Z,
-  insideOf,
-  laneOf,
   LIFT,
   PROMENADE_Z,
-  roomById,
   type Vec2,
   type Waypoint,
+  allRooms,
+  insideOf,
+  laneOf,
+  roomById,
 } from "./layout.ts";
 
 // Zona = id ruangan, "hall" untuk koridor dan pojok bersama di dalam gedung, atau "outside" untuk kampus.

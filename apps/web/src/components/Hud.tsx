@@ -247,12 +247,10 @@ export function Hud({ onOpenPalette }: { onOpenPalette: () => void }) {
         <p className="hud-sub hud-time">
           <PhaseIcon className="w-3.5 h-3.5" aria-hidden />
           {PHASE_LABEL[phase]} ·{" "}
-          {env
-            .now()
-            .toLocaleTimeString("id-ID", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+          {env.now().toLocaleTimeString("id-ID", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
           <WeatherIcon className="w-3.5 h-3.5 ml-1" aria-hidden />
           {WEATHER_LABEL[weather]}
           {tempC !== null && ` ${tempC}°C`}

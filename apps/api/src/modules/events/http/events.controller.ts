@@ -6,7 +6,7 @@ import { EventBusService, type SystemEvent } from "../event-bus.service.js";
 export class EventsController {
   constructor(
     @Inject(EventBusService)
-    private readonly eventBus: EventBusService
+    private readonly eventBus: EventBusService,
   ) {}
 
   @Sse()

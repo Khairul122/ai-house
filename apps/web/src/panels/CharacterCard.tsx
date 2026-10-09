@@ -1,7 +1,17 @@
 import { useEffect, useId, useState } from "react";
-import { RELIGION_LABEL, type Religion } from "../features/office/environment.ts";
+import {
+  RELIGION_LABEL,
+  type Religion,
+} from "../features/office/environment.ts";
 import { useLook } from "../features/office/looks.ts";
-import { EMOTION_LABEL, mood, NEED_LABEL, type Need, type SimState, simOf } from "../features/office/sims.ts";
+import {
+  EMOTION_LABEL,
+  NEED_LABEL,
+  type Need,
+  type SimState,
+  mood,
+  simOf,
+} from "../features/office/sims.ts";
 import { fetchJson } from "../lib/api.ts";
 import { reloadDivisions } from "../state/store.ts";
 
@@ -12,7 +22,6 @@ export function useSim(id: string): SimState {
     return { needs: { ...s.needs }, emotion: s.emotion, activity: s.activity };
   };
   const [sim, setSim] = useState(read);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: read hanya bergantung pada id
   useEffect(() => {
     setSim(read());
     const t = setInterval(() => setSim(read()), 700);
@@ -21,7 +30,8 @@ export function useSim(id: string): SimState {
   return sim;
 }
 
-const tone = (v: number) => (v >= 60 ? "var(--ok)" : v >= 30 ? "var(--warn)" : "var(--danger)");
+const tone = (v: number) =>
+  v >= 60 ? "var(--ok)" : v >= 30 ? "var(--warn)" : "var(--danger)";
 
 export function Bar({ label, value }: { label: string; value: number }) {
   return (
@@ -30,15 +40,29 @@ export function Bar({ label, value }: { label: string; value: number }) {
         <span className="text-ink-muted">{label}</span>
         <span className="text-ink tabular-nums">{Math.round(value)}</span>
       </div>
-      <div className="need-track" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value)}>
-        <div className="need-fill" style={{ width: `${value}%`, background: tone(value) }} />
+      <div
+        className="need-track"
+        role="meter"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(value)}
+      >
+        <div
+          className="need-fill"
+          style={{ width: `${value}%`, background: tone(value) }}
+        />
       </div>
     </div>
   );
 }
 
 // Kartu karakter ala The Sims: siapa dia, perasaannya, kebutuhannya, dan sedang apa.
-export function CharacterCard({ id, divisionName, religion }: { id: string; divisionName: string; religion?: string }) {
+export function CharacterCard({
+  id,
+  divisionName,
+  religion,
+}: { id: string; divisionName: string; religion?: string }) {
   const look = useLook(id);
   const sim = useSim(id);
   const m = mood(sim.needs);
@@ -47,13 +71,18 @@ export function CharacterCard({ id, divisionName, religion }: { id: string; divi
     <section className="character-card" style={{ borderTopColor: look.accent }}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-display text-lg text-ink leading-tight">{look.name}</p>
+          <p className="font-display text-lg text-ink leading-tight">
+            {look.name}
+          </p>
           <p className="text-xs text-ink-muted">
             {divisionName}
-            {religion && ` · ${RELIGION_LABEL[religion as Religion] ?? religion}`}
+            {religion &&
+              ` · ${RELIGION_LABEL[religion as Religion] ?? religion}`}
           </p>
         </div>
-        <span className={`tag emotion-${sim.emotion} shrink-0`}>{EMOTION_LABEL[sim.emotion]}</span>
+        <span className={`tag emotion-${sim.emotion} shrink-0`}>
+          {EMOTION_LABEL[sim.emotion]}
+        </span>
       </div>
 
       <p className="text-sm text-ink mt-2">
@@ -84,7 +113,10 @@ export function CharacterCard({ id, divisionName, religion }: { id: string; divi
 }
 
 // Pemilih agama karakter; disimpan ke berkas divisi.
-export function ReligionPicker({ divisionId, current }: { divisionId: string; current?: string }) {
+export function ReligionPicker({
+  divisionId,
+  current,
+}: { divisionId: string; current?: string }) {
   const [value, setValue] = useState(current ?? "");
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const selectId = useId();
@@ -95,10 +127,13 @@ export function ReligionPicker({ divisionId, current }: { divisionId: string; cu
     fetchJson(`/api/divisions/${divisionId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ religion })
+      body: JSON.stringify({ religion }),
     })
       .then(() => {
-        setNote({ ok: true, text: "Tersimpan. Jadwal ibadahnya ikut berubah." });
+        setNote({
+          ok: true,
+          text: "Tersimpan. Jadwal ibadahnya ikut berubah.",
+        });
         return reloadDivisions();
       })
       .catch((e: Error) => setNote({ ok: false, text: e.message }));
@@ -106,7 +141,10 @@ export function ReligionPicker({ divisionId, current }: { divisionId: string; cu
 
   return (
     <div>
-      <label htmlFor={selectId} className="text-xs font-semibold text-ink-muted">
+      <label
+        htmlFor={selectId}
+        className="text-xs font-semibold text-ink-muted"
+      >
         Agama
       </label>
       <select
@@ -124,7 +162,11 @@ export function ReligionPicker({ divisionId, current }: { divisionId: string; cu
           </option>
         ))}
       </select>
-      {note && <p className={`text-xs mt-1 ${note.ok ? "text-ok" : "text-danger"}`}>{note.text}</p>}
+      {note && (
+        <p className={`text-xs mt-1 ${note.ok ? "text-ok" : "text-danger"}`}>
+          {note.text}
+        </p>
+      )}
     </div>
   );
 }

@@ -7,14 +7,14 @@ import { DivisionsController } from "./modules/divisions/http/divisions.controll
 import { FileDivisionRepository } from "./modules/divisions/infrastructure/file-division.repository.js";
 import { EventBusService } from "./modules/events/event-bus.service.js";
 import { EventsController } from "./modules/events/http/events.controller.js";
+import { OfficeController } from "./modules/office/office.controller.js";
+import { OrchestratorService } from "./modules/orchestrator/orchestrator.service.js";
 import { ProjectService } from "./modules/projects/application/project.service.js";
 import { ProjectsController } from "./modules/projects/http/projects.controller.js";
 import { WorkspaceFilesController } from "./modules/projects/http/workspace-files.controller.js";
-import { TaskService } from "./modules/tasks/application/task.service.js";
-import { OfficeController } from "./modules/office/office.controller.js";
 import { SocialController } from "./modules/social/social.controller.js";
 import { SocialService } from "./modules/social/social.service.js";
-import { OrchestratorService } from "./modules/orchestrator/orchestrator.service.js";
+import { TaskService } from "./modules/tasks/application/task.service.js";
 import { TelegramBotService } from "./modules/telegram/bot.service.js";
 
 @Module({
@@ -26,7 +26,7 @@ import { TelegramBotService } from "./modules/telegram/bot.service.js";
     ApprovalsController,
     EventsController,
     OfficeController,
-    SocialController
+    SocialController,
   ],
   providers: [
     AuditService,
@@ -38,7 +38,7 @@ import { TelegramBotService } from "./modules/telegram/bot.service.js";
     ApprovalService,
     OrchestratorService,
     SocialService,
-    runtimeProvider
-  ]
+    runtimeProvider,
+  ],
 })
 export class AppModule {}

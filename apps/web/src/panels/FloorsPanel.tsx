@@ -1,5 +1,6 @@
 import { Building2 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Empty, ErrorNote, PanelShell } from "../components/PanelShell.tsx";
 import { lookOf } from "../features/office/looks.ts";

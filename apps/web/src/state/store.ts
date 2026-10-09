@@ -1,10 +1,20 @@
 import { useEffect, useSyncExternalStore } from "react";
-import { getRooms, type RoomDef, setRoomOrder } from "../features/office/layout.ts";
+import {
+  type RoomDef,
+  getRooms,
+  setRoomOrder,
+} from "../features/office/layout.ts";
 import { fetchJson } from "../lib/api.ts";
 import { playEventSound } from "../lib/sound.ts";
 import { trackFlow } from "./flows.ts";
 import { push, toastFor } from "./notify.ts";
-import { initialState, reduce, type OfficeEvent, type OfficeState, type SnapshotItem } from "./reduce.ts";
+import {
+  type OfficeEvent,
+  type OfficeState,
+  type SnapshotItem,
+  initialState,
+  reduce,
+} from "./reduce.ts";
 
 let state: OfficeState = initialState;
 const listeners = new Set<() => void>();
@@ -20,7 +30,7 @@ export const office = {
   subscribe(l: () => void) {
     listeners.add(l);
     return () => listeners.delete(l);
-  }
+  },
 };
 
 export function useOffice<T>(select: (s: OfficeState) => T): T {
@@ -51,7 +61,11 @@ export interface Division {
   order?: number;
   religion?: string;
   persona?: Persona;
-  permission: { read: string; edit: string; bash: { allow: string[]; ask: string[]; deny: string[] } };
+  permission: {
+    read: string;
+    edit: string;
+    bash: { allow: string[]; ask: string[]; deny: string[] };
+  };
 }
 
 // Lantai gedung = bidang (Software, Content Creator, ...), dari bawah ke atas.
@@ -95,7 +109,10 @@ export const coordinatorId = (list: Division[] = divisions): string | null =>
 // Ketua bidang divisi ini (koordinator di lantainya), atau koordinator utama.
 export const leadFor = (divisionId: string | undefined): string | null => {
   const floor = divisions.find((d) => d.id === divisionId)?.floor;
-  return divisions.find((d) => d.floor === floor && d.role === "coordinator")?.id ?? coordinatorId();
+  return (
+    divisions.find((d) => d.floor === floor && d.role === "coordinator")?.id ??
+    coordinatorId()
+  );
 };
 
 export function useCoordinatorId(): string | null {
@@ -103,14 +120,23 @@ export function useCoordinatorId(): string | null {
 }
 
 // Tugas perencanaan milik koordinator (utama atau ketua bidang): tidak bisa direvisi dan tidak dihitung sebagai pekerjaan.
-export function useIsPlanTask(): (t: { divisionId: string; title: string }) => boolean {
+export function useIsPlanTask(): (t: {
+  divisionId: string;
+  title: string;
+}) => boolean {
   const list = useDivisions();
   const title = useHouse()?.planTaskTitle;
-  return (t) => !!title && t.title === title && list.find((d) => d.id === t.divisionId)?.role === "coordinator";
+  return (t) =>
+    !!title &&
+    t.title === title &&
+    list.find((d) => d.id === t.divisionId)?.role === "coordinator";
 }
 
 export const reloadDivisions = () =>
-  Promise.all([fetchJson<Division[]>("/api/divisions"), fetchJson<Floor[]>("/api/floors")])
+  Promise.all([
+    fetchJson<Division[]>("/api/divisions"),
+    fetchJson<Floor[]>("/api/floors"),
+  ])
     .then(([d, f]) => {
       divisions = d;
       floors = f;
@@ -135,7 +161,8 @@ const meetingListeners = new Set<() => void>();
 
 // Lantai yang sedang rapat: karakternya berkumpul di ruang rapat. Dibaca tiap frame oleh karakter.
 export const meetingOn = (floorId: string | undefined) =>
-  !!floorId && meetings.some((m) => m.floorId === floorId && m.status === "in_progress");
+  !!floorId &&
+  meetings.some((m) => m.floorId === floorId && m.status === "in_progress");
 
 export function useMeetings(): Meeting[] {
   return useSyncExternalStore(
@@ -143,7 +170,7 @@ export function useMeetings(): Meeting[] {
       meetingListeners.add(l);
       return () => meetingListeners.delete(l);
     },
-    () => meetings
+    () => meetings,
   );
 }
 
@@ -173,7 +200,8 @@ const houseWaiters: ((h: HouseProfile) => void)[] = [];
 export const getHouse = () => house;
 
 // Menunggu profil kantor termuat (dipakai mis. untuk cuaca nyata di lokasi kantor).
-export const whenHouse = (): Promise<HouseProfile> => (house ? Promise.resolve(house) : new Promise((r) => houseWaiters.push(r)));
+export const whenHouse = (): Promise<HouseProfile> =>
+  house ? Promise.resolve(house) : new Promise((r) => houseWaiters.push(r));
 
 export function useHouse(): HouseProfile | null {
   return useSyncExternalStore(
@@ -181,7 +209,7 @@ export function useHouse(): HouseProfile | null {
       houseListeners.add(l);
       return () => houseListeners.delete(l);
     },
-    () => house
+    () => house,
   );
 }
 
@@ -234,9 +262,11 @@ export function useLiveOffice() {
   }, []);
 }
 
-const divisionName = (id: string | null | undefined) => divisions.find((d) => d.id === id)?.name ?? id ?? "Sistem";
+const divisionName = (id: string | null | undefined) =>
+  divisions.find((d) => d.id === id)?.name ?? id ?? "Sistem";
 
 export function useDivisionName() {
   const list = useDivisions();
-  return (id: string | null | undefined) => list.find((d) => d.id === id)?.name ?? id ?? "Sistem";
+  return (id: string | null | undefined) =>
+    list.find((d) => d.id === id)?.name ?? id ?? "Sistem";
 }

@@ -6,7 +6,7 @@ export const divisions = sqliteTable("divisions", {
   model: text("model").notNull(),
   promptHash: text("prompt_hash").notNull(),
   configJson: text("config_json").notNull(),
-  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true)
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
 });
 
 export const projects = sqliteTable("projects", {
@@ -20,12 +20,14 @@ export const projects = sqliteTable("projects", {
   floorId: text("floor_id"), // null = seluruh gedung
   kind: text("kind").notNull().default("project"), // project | meeting
   createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull()
+  updatedAt: text("updated_at").notNull(),
 });
 
 export const tasks = sqliteTable("tasks", {
   id: text("id").primaryKey(), // ulid
-  projectId: text("project_id").notNull().references(() => projects.id),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id),
   divisionId: text("division_id").notNull(),
   title: text("title").notNull(),
   description: text("description").notNull(),
@@ -34,29 +36,37 @@ export const tasks = sqliteTable("tasks", {
   attempt: integer("attempt").notNull().default(1),
   resultSummary: text("result_summary"),
   createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull()
+  updatedAt: text("updated_at").notNull(),
 });
 
 export const taskDependencies = sqliteTable("task_dependencies", {
-  taskId: text("task_id").notNull().references(() => tasks.id),
-  dependsOnId: text("depends_on_id").notNull().references(() => tasks.id)
+  taskId: text("task_id")
+    .notNull()
+    .references(() => tasks.id),
+  dependsOnId: text("depends_on_id")
+    .notNull()
+    .references(() => tasks.id),
 });
 
 export const runs = sqliteTable("runs", {
   id: text("id").primaryKey(), // ulid
-  taskId: text("task_id").notNull().references(() => tasks.id),
+  taskId: text("task_id")
+    .notNull()
+    .references(() => tasks.id),
   sessionId: text("session_id").notNull(),
   status: text("status").notNull().default("running"),
   startedAt: text("started_at").notNull(),
   endedAt: text("ended_at"),
   tokensIn: integer("tokens_in").notNull().default(0),
   tokensOut: integer("tokens_out").notNull().default(0),
-  error: text("error")
+  error: text("error"),
 });
 
 export const approvals = sqliteTable("approvals", {
   id: text("id").primaryKey(), // ulid
-  runId: text("run_id").notNull().references(() => runs.id),
+  runId: text("run_id")
+    .notNull()
+    .references(() => runs.id),
   riskLevel: integer("risk_level").notNull(),
   actionType: text("action_type").notNull(),
   actionSummary: text("action_summary").notNull(),
@@ -64,17 +74,21 @@ export const approvals = sqliteTable("approvals", {
   status: text("status").notNull().default("pending"),
   decidedBy: text("decided_by"),
   decidedAt: text("decided_at"),
-  expiresAt: text("expires_at").notNull()
+  expiresAt: text("expires_at").notNull(),
 });
 
 export const artifacts = sqliteTable("artifacts", {
   id: text("id").primaryKey(), // ulid
-  projectId: text("project_id").notNull().references(() => projects.id),
-  taskId: text("task_id").notNull().references(() => tasks.id),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id),
+  taskId: text("task_id")
+    .notNull()
+    .references(() => tasks.id),
   path: text("path").notNull(),
   kind: text("kind").notNull(),
   size: integer("size").notNull(),
-  createdAt: text("created_at").notNull()
+  createdAt: text("created_at").notNull(),
 });
 
 export const telegramMessages = sqliteTable("telegram_messages", {
@@ -83,7 +97,7 @@ export const telegramMessages = sqliteTable("telegram_messages", {
   direction: text("direction").notNull(), // inbound | outbound
   text: text("text").notNull(),
   projectId: text("project_id"),
-  telegramMessageId: integer("telegram_message_id")
+  telegramMessageId: integer("telegram_message_id"),
 });
 
 export const auditLog = sqliteTable("audit_log", {
@@ -93,12 +107,12 @@ export const auditLog = sqliteTable("audit_log", {
   subjectType: text("subject_type").notNull(),
   subjectId: text("subject_id").notNull(),
   detailJson: text("detail_json").notNull(),
-  occurredAt: text("occurred_at").notNull()
+  occurredAt: text("occurred_at").notNull(),
 });
 
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
-  valueJson: text("value_json").notNull()
+  valueJson: text("value_json").notNull(),
 });
 
 // Akun sosial media terdaftar. `secretJson` berisi token dan tidak pernah dikirim ke browser.
@@ -108,13 +122,15 @@ export const socialAccounts = sqliteTable("social_accounts", {
   label: text("label").notNull(),
   handle: text("handle"),
   secretJson: text("secret_json").notNull(),
-  createdAt: text("created_at").notNull()
+  createdAt: text("created_at").notNull(),
 });
 
 // Unggahan yang diajukan divisi (atau pemilik) dan menunggu ditinjau sebelum benar-benar tayang.
 export const socialPosts = sqliteTable("social_posts", {
   id: text("id").primaryKey(), // ulid
-  projectId: text("project_id").notNull().references(() => projects.id),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id),
   taskId: text("task_id"),
   divisionId: text("division_id"),
   accountId: text("account_id"),
@@ -125,5 +141,5 @@ export const socialPosts = sqliteTable("social_posts", {
   resultUrl: text("result_url"),
   error: text("error"),
   createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull()
+  updatedAt: text("updated_at").notNull(),
 });

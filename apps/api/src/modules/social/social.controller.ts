@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Inject, Param, Patch, Post, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from "@nestjs/common";
 import { platformList } from "./platforms.js";
 import { SocialService } from "./social.service.js";
 
@@ -47,7 +57,10 @@ export class SocialController {
   }
 
   @Patch("posts/:id")
-  updatePost(@Param("id") id: string, @Body() body: { accountId?: string | null; caption?: string }) {
+  updatePost(
+    @Param("id") id: string,
+    @Body() body: { accountId?: string | null; caption?: string },
+  ) {
     return this.social.updatePost(id, body ?? {});
   }
 

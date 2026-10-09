@@ -13,7 +13,12 @@ export type RunEvent =
   | { type: "text"; content: string }
   | { type: "tool"; name: string; summary: string }
   // permission: jenis aksi dari OpenCode (bash, edit, webfetch, ...) dan pola targetnya
-  | { type: "permission"; permissionId: string; permission: string; patterns: string[] }
+  | {
+      type: "permission";
+      permissionId: string;
+      permission: string;
+      patterns: string[];
+    }
   | { type: "usage"; tokensIn: number; tokensOut: number }
   // tanda hidup: agen masih memproses (dipakai pengawas run macet)
   | { type: "activity" }
@@ -23,8 +28,16 @@ export type RunEvent =
 export interface AgentRuntime {
   startRun(input: StartRunInput): Promise<void>;
   cancelRun(runId: string): Promise<void>;
-  respondPermission(runId: string, permissionId: string, decision: "allow" | "deny", message?: string): Promise<void>;
-  onEvent(runId: string, callback: (event: RunEvent) => Promise<void> | void): void;
+  respondPermission(
+    runId: string,
+    permissionId: string,
+    decision: "allow" | "deny",
+    message?: string,
+  ): Promise<void>;
+  onEvent(
+    runId: string,
+    callback: (event: RunEvent) => Promise<void> | void,
+  ): void;
 }
 
 export const AGENT_RUNTIME = Symbol("AGENT_RUNTIME");
